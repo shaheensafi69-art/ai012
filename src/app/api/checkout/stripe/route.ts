@@ -32,7 +32,7 @@ export async function POST(request: Request) {
     }
 
     // آدرس دامنه شما (مثال: http://localhost:3000 یا https://safi-hub.com)
-    const appUrl = process.env.NEXT_PUBLIC_APP_URL || 'http://localhost:3000';
+    const appUrl = process.env.NEXT_PUBLIC_APP_URL || 'https://www.safiai.site';
 
     // ۲. ساخت نشست پرداخت استرایپ (Checkout Session)
     const session = await stripe.checkout.sessions.create({

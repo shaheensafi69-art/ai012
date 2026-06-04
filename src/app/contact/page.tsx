@@ -23,9 +23,9 @@ const SOLAR_SYSTEM = [
 // CONTACT METHODS DATA (Updated)
 // ============================================================================
 const CONTACT_METHODS = [
-  { title: "WhatsApp", value: "+44 7000 000000", icon: <MessageCircle className="w-6 h-6 text-[#FAD961]" />, href: "https://wa.me/447000000000", delay: 0.1 },
-  { title: "Direct Call", value: "+44 20 7946 0958", icon: <Phone className="w-6 h-6 text-[#FAD961]" />, href: "tel:+442079460958", delay: 0.2 },
-  { title: "Email Us", value: "support@safi-ai.com", icon: <Mail className="w-6 h-6 text-[#FAD961]" />, href: "mailto:support@safi-ai.com", delay: 0.3 }
+  { title: "WhatsApp", value: "+44 7476620282", icon: <MessageCircle className="w-6 h-6 text-[#FAD961]" />, href: "https://wa.me/447476620282", delay: 0.1 },
+  { title: "Direct Call", value: "+44 7476620282", icon: <Phone className="w-6 h-6 text-[#FAD961]" />, href: "tel:+447476620282", delay: 0.2 },
+  { title: "Email Us", value: "safipay@hotmail.com", icon: <Mail className="w-6 h-6 text-[#FAD961]" />, href: "mailto:safipay@hotmail.com", delay: 0.3 }
 ];
 
 export default function ContactPage() {

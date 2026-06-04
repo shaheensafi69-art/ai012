@@ -20,7 +20,7 @@ const LOADING_MESSAGES = [
 ];
 
 export default function VideoGeneratorPage() {
-  // Global States (Updated for Quota System)
+  // Global States
   const [userId, setUserId] = useState<string | null>(null);
   const [planName, setPlanName] = useState<string>('Free');
   const [videosTotal, setVideosTotal] = useState<number>(0);
@@ -36,7 +36,7 @@ export default function VideoGeneratorPage() {
   const [imageUrl, setImageUrl] = useState<string | null>(null);
   const [motionStrength, setMotionStrength] = useState(50);
   const [aspectRatio, setAspectRatio] = useState('16:9');
-  const [renderDuration, setRenderDuration] = useState(10); // ثابت روی ۱۰ ثانیه بر اساس پلن
+  const [renderDuration, setRenderDuration] = useState(10);
 
   // Status & Safety States
   const fileInputRef = useRef<HTMLInputElement>(null);
@@ -48,8 +48,10 @@ export default function VideoGeneratorPage() {
   const [renderComplete, setRenderComplete] = useState(false);
   const [outputVideoUrl, setOutputVideoUrl] = useState<string | null>(null);
   const [uiError, setUiError] = useState<string | null>(null);
+  
+  // 🟢 استیت جدید: کنترل اینکه آیا کاربر یک بار ریجنریت کرده است یا خیر
+  const [canRegenerate, setCanRegenerate] = useState(true);
 
-  // 1. Initial Data Fetching
   useEffect(() => {
     async function loadStudioData() {
       const { data: { user } } = await supabase.auth.getUser();
@@ -94,7 +96,6 @@ export default function VideoGeneratorPage() {
     };
   }, []);
 
-  // 2. Cycle Loading Messages During Render
   useEffect(() => {
     let msgInterval: NodeJS.Timeout;
     if (isRendering && !renderComplete) {
@@ -105,7 +106,6 @@ export default function VideoGeneratorPage() {
     return () => clearInterval(msgInterval);
   }, [isRendering, renderComplete]);
 
-  // 3. Secure File Upload
   const handleFileUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
     setUiError(null);
     const file = e.target.files?.[0];
@@ -143,7 +143,6 @@ export default function VideoGeneratorPage() {
     }
   };
 
-  // 4. Polling Task Status
   const pollTaskStatus = async (taskIdStr: string) => {
     let attempts = 0;
     const maxAttempts = 100;
@@ -184,9 +183,8 @@ export default function VideoGeneratorPage() {
     }, 6000); 
   };
 
-  // 5. Form Submission (Smart Error Masking)
-  const handleInitializeGeneration = async (e: React.FormEvent) => {
-    e.preventDefault();
+  // 🟢 لاجیک مجزا شده برای ارسال تا بتوان در حالت Regenerate هم از آن استفاده کرد
+  const executeGeneration = async (isRegen: boolean = false) => {
     setUiError(null);
 
     if (videosTotal === 0) return setUiError(`Your current plan (${planName}) does not support video generation. Please upgrade.`);
@@ -194,6 +192,13 @@ export default function VideoGeneratorPage() {
     if (!selectedModel) return setUiError("Please select a synthesis engine.");
     if (videoMode === 'text' && !prompt.trim()) return setUiError("Prompt description is required.");
     if (videoMode === 'image' && !imageUrl) return setUiError("Base image is required for Image-to-Video.");
+
+    // تنظیم قابلیت ریجنریت: اگر الان دارد ریجنریت می‌کند، دفعات بعد خاموش شود. اگر ران اول است، روشن باشد.
+    if (isRegen) {
+      setCanRegenerate(false);
+    } else {
+      setCanRegenerate(true);
+    }
 
     setIsRendering(true);
     setRenderComplete(false);
@@ -238,7 +243,6 @@ export default function VideoGeneratorPage() {
       clearInterval(visualProgress);
       setIsRendering(false);
       
-      // 🚨 سیستم هوشمند فیلتر خطاها
       let finalErrorMessage = "An unexpected error occurred.";
       const rawError = (error.message || "").toLowerCase();
 
@@ -254,6 +258,11 @@ export default function VideoGeneratorPage() {
     }
   };
 
+  const handleInitializeGeneration = async (e: React.FormEvent) => {
+    e.preventDefault();
+    await executeGeneration(false);
+  };
+
   const isQuotaExceeded = videosTotal === 0 || videosUsed >= videosTotal;
   const videosRemaining = Math.max(0, videosTotal - videosUsed);
 
@@ -261,7 +270,6 @@ export default function VideoGeneratorPage() {
     <main className="relative min-h-screen text-slate-100 overflow-hidden pb-16 pt-24 md:pt-32 px-4 sm:px-6 lg:px-16 selection:bg-fuchsia-500 selection:text-white bg-[#050014]">
       <input type="file" ref={fileInputRef} className="hidden" accept="image/png, image/jpeg, image/jpg" onChange={handleFileUpload} />
 
-      {/* 🌌 Background Glowing Effects */}
       <div className="absolute inset-0 z-0 pointer-events-none overflow-hidden">
         <div className="absolute inset-0 bg-[#050014]" />
         <div className="absolute top-[-10%] left-[-10%] w-[60%] h-[60%] bg-violet-600/10 rounded-full blur-[150px]" />
@@ -271,9 +279,6 @@ export default function VideoGeneratorPage() {
 
       <div className="relative z-10 max-w-[90rem] mx-auto">
         
-        {/* ==========================================
-            HEADER SECTION (Quota Display)
-        ========================================== */}
         <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-6 mb-12 mt-4 md:mt-0">
           <div className="space-y-1">
             <Link href="/dashboard" className="inline-flex items-center gap-2 text-xs font-bold text-neutral-400 hover:text-fuchsia-400 transition-colors uppercase tracking-widest mb-2 bg-white/5 px-3 py-1.5 rounded-full border border-white/5">
@@ -295,9 +300,6 @@ export default function VideoGeneratorPage() {
           </div>
         </div>
 
-        {/* ==========================================
-            QUOTA WARNING BANNER
-        ========================================== */}
         <AnimatePresence>
           {isQuotaExceeded && (
             <motion.div initial={{ opacity: 0, y: -10 }} animate={{ opacity: 1, y: 0 }} className="bg-red-500/10 border border-red-500/20 text-red-400 px-6 py-4 rounded-3xl flex flex-col sm:flex-row sm:items-center gap-4 text-sm font-bold mb-8 shadow-lg">
@@ -312,14 +314,8 @@ export default function VideoGeneratorPage() {
 
         <div className="grid lg:grid-cols-12 gap-8 items-start">
           
-          {/* ============================== */}
-          {/* LEFT: CONTROLS PANEL           */}
-          {/* ============================== */}
           <div className="lg:col-span-7 bg-[#0A051A]/80 backdrop-blur-2xl border border-white/10 rounded-[2.5rem] p-6 md:p-8 shadow-2xl relative">
-            
             <form onSubmit={handleInitializeGeneration} className="space-y-7">
-              
-              {/* Engine Selector */}
               <div className="space-y-2">
                 <label className="text-[11px] font-black tracking-[0.2em] text-fuchsia-400 uppercase flex items-center gap-2 ml-2">
                   <Cpu className="w-4 h-4" /> Synthesis Engine
@@ -339,13 +335,11 @@ export default function VideoGeneratorPage() {
                 </select>
               </div>
 
-              {/* Mode Toggles */}
               <div className="flex bg-[#03000A] border border-white/10 p-1.5 rounded-full shadow-inner">
                 <button type="button" disabled={isQuotaExceeded} onClick={() => setVideoMode('text')} className={`flex-1 py-3.5 text-xs font-black uppercase tracking-wider rounded-full transition-all duration-300 ${videoMode === 'text' ? 'bg-gradient-to-r from-violet-600 to-fuchsia-600 text-white shadow-lg' : 'text-neutral-500 hover:text-white'} disabled:opacity-50`}>Text to Video</button>
                 <button type="button" disabled={isQuotaExceeded} onClick={() => setVideoMode('image')} className={`flex-1 py-3.5 text-xs font-black uppercase tracking-wider rounded-full transition-all duration-300 ${videoMode === 'image' ? 'bg-gradient-to-r from-violet-600 to-fuchsia-600 text-white shadow-lg' : 'text-neutral-500 hover:text-white'} disabled:opacity-50`}>Image to Video</button>
               </div>
 
-              {/* Secure Upload Area */}
               <AnimatePresence>
                 {videoMode === 'image' && (
                   <motion.div initial={{ opacity: 0, height: 0 }} animate={{ opacity: 1, height: 'auto' }} exit={{ opacity: 0, height: 0 }}>
@@ -364,7 +358,6 @@ export default function VideoGeneratorPage() {
                 )}
               </AnimatePresence>
 
-              {/* Prompt Input */}
               <div className="space-y-2">
                 <label className="text-[11px] font-black tracking-[0.2em] text-fuchsia-400 uppercase ml-2">Prompt Architecture</label>
                 <textarea 
@@ -375,7 +368,6 @@ export default function VideoGeneratorPage() {
                 />
               </div>
 
-              {/* Parameter Settings */}
               <div className="border-t border-white/10 pt-7 space-y-6">
                 <div className="flex items-center justify-between text-xs font-black uppercase tracking-wider">
                   <div className="flex items-center gap-2 text-neutral-300 ml-2"><Sliders className="w-4 h-4 text-fuchsia-400" /> Parameters</div>
@@ -406,7 +398,6 @@ export default function VideoGeneratorPage() {
                 </div>
               </div>
 
-              {/* UI Error Display */}
               <AnimatePresence>
                 {uiError && (
                   <motion.div initial={{ opacity: 0, height: 0 }} animate={{ opacity: 1, height: 'auto' }} exit={{ opacity: 0, height: 0 }} className="bg-red-500/10 border border-red-500/20 text-red-400 px-5 py-4 rounded-3xl flex items-start gap-3 text-sm font-bold overflow-hidden">
@@ -415,7 +406,6 @@ export default function VideoGeneratorPage() {
                 )}
               </AnimatePresence>
 
-              {/* Action Button */}
               <button 
                 type="submit" 
                 disabled={isRendering || isUploading || !selectedModel || isQuotaExceeded} 
@@ -436,28 +426,21 @@ export default function VideoGeneratorPage() {
             </form>
           </div>
 
-          {/* ============================== */}
-          {/* RIGHT: MONITOR & ARCHIVE       */}
-          {/* ============================== */}
           <div className="lg:col-span-5 flex flex-col gap-6">
             
-            {/* Monitor */}
-            <div className="aspect-[4/5] md:aspect-square lg:aspect-[4/5] w-full bg-[#0A051A]/80 backdrop-blur-2xl border border-white/10 rounded-[2.5rem] relative overflow-hidden flex flex-col items-center justify-center p-6 shadow-2xl">
+            <div className="w-full bg-[#0A051A]/80 backdrop-blur-2xl border border-white/10 rounded-[2.5rem] relative overflow-hidden flex flex-col items-center justify-center p-6 shadow-2xl min-h-[400px]">
               
               <AnimatePresence mode="wait">
                 {isRendering && (
                   <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} className="absolute inset-0 bg-[#050014]/95 backdrop-blur-md p-8 z-30 flex flex-col items-center justify-center text-center">
-                    
                     <div className="w-32 h-32 rounded-full border-2 border-dashed border-fuchsia-500/50 animate-[spin_8s_linear_infinite] flex items-center justify-center mb-6 relative shadow-[0_0_40px_rgba(217,70,239,0.15)]">
                       <div className="absolute inset-3 bg-gradient-to-tr from-violet-600/30 to-fuchsia-600/30 rounded-full animate-pulse" />
                       <Film className="w-12 h-12 text-fuchsia-400" />
                     </div>
                     <p className="text-6xl font-black font-mono tracking-tighter text-white mb-4 drop-shadow-lg">{progress}%</p>
-                    
                     <motion.p key={loadingMsgIndex} initial={{ opacity: 0, y: 8 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0, y: -8 }} className="text-xs font-bold tracking-[0.15em] text-fuchsia-400 uppercase h-6 drop-shadow px-4 leading-relaxed">
                       {LOADING_MESSAGES[loadingMsgIndex]}
                     </motion.p>
-                    
                     <div className="w-full bg-[#03000A] border border-white/10 h-2.5 rounded-full mt-8 overflow-hidden max-w-[200px] shadow-inner">
                       <motion.div className="h-full bg-gradient-to-r from-violet-600 to-fuchsia-500" style={{ width: `${progress}%` }} />
                     </div>
@@ -465,21 +448,42 @@ export default function VideoGeneratorPage() {
                 )}
 
                 {renderComplete && (
-                  <motion.div initial={{ opacity: 0, scale: 0.95 }} animate={{ opacity: 1, scale: 1 }} className="absolute inset-0 bg-[#0A051A]/95 backdrop-blur-xl p-6 z-30 flex flex-col items-center justify-center text-center">
-                    <CheckCircle2 className="w-16 h-16 text-emerald-400 mb-4 drop-shadow-[0_0_30px_rgba(52,211,153,0.4)]" />
-                    <h3 className="text-3xl font-black text-white mb-6 tracking-tight">Render Complete</h3>
+                  <motion.div initial={{ opacity: 0, scale: 0.95 }} animate={{ opacity: 1, scale: 1 }} className="absolute inset-0 bg-[#0A051A]/95 backdrop-blur-xl p-6 z-30 flex flex-col items-center justify-center text-center overflow-y-auto custom-scrollbar">
+                    <CheckCircle2 className="w-12 h-12 text-emerald-400 mb-3 drop-shadow-[0_0_30px_rgba(52,211,153,0.4)] shrink-0 mt-4" />
+                    <h3 className="text-2xl font-black text-white mb-6 tracking-tight shrink-0">Render Complete</h3>
                     
-                    <div className="w-full aspect-video bg-black border border-white/10 rounded-3xl overflow-hidden relative shadow-2xl">
+                    {/* 🟢 پیش‌نمایش دقیق (Flawless Preview Box) بر اساس ابعاد انتخابی */}
+                    <div className={`relative bg-black border border-white/10 rounded-2xl overflow-hidden shadow-2xl flex items-center justify-center shrink-0 ${
+                      aspectRatio === '9:16' ? 'aspect-[9/16] max-h-[45vh] w-auto mx-auto' : 'aspect-video w-full'
+                    }`}>
                       {outputVideoUrl ? (
-                        <video src={outputVideoUrl} controls autoPlay loop className="w-full h-full object-cover" />
+                        <video src={outputVideoUrl} controls autoPlay loop className="w-full h-full object-contain" />
                       ) : (
                         <div className="absolute inset-0 flex items-center justify-center text-xs text-neutral-600 font-bold uppercase tracking-widest">Asset Not Found</div>
                       )}
                     </div>
 
-                    <div className="grid grid-cols-2 gap-4 w-full mt-8">
-                      <button onClick={() => setRenderComplete(false)} className="py-4 rounded-full border border-white/10 text-xs font-black uppercase text-neutral-400 transition-colors hover:bg-white/5 hover:text-white">Dismiss</button>
-                      {outputVideoUrl && <a href={outputVideoUrl} download target="_blank" rel="noreferrer" className="py-4 rounded-full bg-gradient-to-r from-violet-600 to-fuchsia-600 text-white text-xs font-black uppercase flex items-center justify-center gap-2 hover:scale-[1.02] transition-transform shadow-[0_0_20px_rgba(217,70,239,0.3)]"><Download className="w-4 h-4" /> Download</a>}
+                    {/* 🟢 اکشن بارهای حرفه‌ای (پشتیبانی از دکمه ریجنریت) */}
+                    <div className="flex flex-wrap items-center justify-center gap-3 w-full mt-8 pb-4 shrink-0">
+                      <button onClick={() => setRenderComplete(false)} className="flex-1 min-w-[100px] py-3.5 rounded-full border border-white/10 text-xs font-black uppercase text-neutral-400 transition-colors hover:bg-white/5 hover:text-white">
+                        Dismiss
+                      </button>
+
+                      {/* دکمه ریجنریت یک‌بار مصرف */}
+                      {canRegenerate && (
+                        <button 
+                          onClick={() => executeGeneration(true)} 
+                          className="flex-1 min-w-[130px] py-3.5 rounded-full bg-white/5 border border-white/10 text-white text-xs font-black uppercase flex items-center justify-center gap-2 hover:bg-white/10 transition-colors"
+                        >
+                          <RefreshCw className="w-4 h-4" /> Regenerate
+                        </button>
+                      )}
+
+                      {outputVideoUrl && (
+                        <a href={outputVideoUrl} download target="_blank" rel="noreferrer" className="flex-1 min-w-[130px] py-3.5 rounded-full bg-gradient-to-r from-violet-600 to-fuchsia-600 text-white text-xs font-black uppercase flex items-center justify-center gap-2 hover:scale-[1.02] shadow-[0_0_20px_rgba(217,70,239,0.3)] transition-all">
+                          <Download className="w-4 h-4" /> Download
+                        </a>
+                      )}
                     </div>
                   </motion.div>
                 )}
@@ -496,7 +500,6 @@ export default function VideoGeneratorPage() {
               )}
             </div>
 
-            {/* Local Archives */}
             <div className="bg-[#0A051A]/80 backdrop-blur-2xl border border-white/10 rounded-[2.5rem] p-6 md:p-8 flex-1 shadow-lg">
               <div className="flex items-center gap-2 text-xs font-black text-fuchsia-400 uppercase tracking-widest mb-6 ml-2">
                 <History className="w-4 h-4" /> Output Archive
