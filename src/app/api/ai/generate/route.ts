@@ -88,8 +88,17 @@ export async function POST(request: Request) {
     if (category === 'text') {
       finalApiUrl = 'https://api.x.ai/v1/chat/completions';
       
-      let userContent: any = inputData.prompt;
-      if (inputData.imageUrl) {
+      let userContent: any = inputData.prompt || "Please analyze the content.";
+      
+      // 🟢 پشتیبانی از ارسال یک یا چندین عکس به صورت همزمان برای چت
+      if (inputData.imageUrls && inputData.imageUrls.length > 0) {
+        userContent = [
+          { type: "text", text: inputData.prompt || "Please carefully analyze these images and explain what you see." }
+        ];
+        inputData.imageUrls.forEach((imgUrl: string) => {
+          userContent.push({ type: "image_url", image_url: { url: imgUrl } });
+        });
+      } else if (inputData.imageUrl) {
         userContent = [
           { type: "text", text: inputData.prompt || "Please carefully analyze this image and explain what you see." },
           { type: "image_url", image_url: { url: inputData.imageUrl } }
@@ -97,7 +106,7 @@ export async function POST(request: Request) {
       }
 
       payload = {
-        model: actualApiModel, // استفاده از نام ترجمه‌شده
+        model: actualApiModel, 
         messages: [
           { 
             role: "system", 
@@ -115,16 +124,15 @@ export async function POST(request: Request) {
     else if (category === 'image') {
       finalApiUrl = 'https://api.x.ai/v1/images/generations';
       payload = {
-        model: actualApiModel, // استفاده از نام ترجمه‌شده
-        prompt: inputData.prompt,
-        n: 1,
-        size: inputData.aspectRatio === '16:9' ? '1920x1080' : '1024x1024'
+        model: actualApiModel,
+        prompt: inputData.prompt
+        // ❌ پارامترهای size و n به دلیل پشتیبانی نشدن در xAI حذف شدند تا ارور 400 برطرف شود
       };
     } 
     else if (category === 'video') {
       finalApiUrl = 'https://api.x.ai/v1/videos/generations';
       payload = {
-        model: actualApiModel, // استفاده از نام ترجمه‌شده
+        model: actualApiModel, 
         prompt: inputData.prompt,
         duration: durationInSeconds || 5
       };
@@ -135,7 +143,7 @@ export async function POST(request: Request) {
     else if (category === 'audio') {
       finalApiUrl = 'https://api.x.ai/v1/audio/speech';
       payload = {
-        model: actualApiModel, // استفاده از نام ترجمه‌شده
+        model: actualApiModel, 
         input: inputData.prompt,
         voice: inputData.voiceUrl || 'alloy'
       };
