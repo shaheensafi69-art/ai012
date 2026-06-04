@@ -126,8 +126,17 @@ export async function POST(request: Request) {
       payload = {
         model: actualApiModel,
         prompt: inputData.prompt
-        // ❌ پارامترهای size و n به دلیل پشتیبانی نشدن در xAI حذف شدند تا ارور 400 برطرف شود
       };
+
+      // 🟢 قابلیت ادیت یا بازسازی عکس (Image-to-Image)
+      // اگر کاربر عکسی آپلود کرده باشد، آن را به عنوان الگو (Reference) می‌فرستیم
+      if (inputData.imageUrls && inputData.imageUrls.length > 0) {
+        // سرور xAI برای ادیت عکس، حداکثر از 3 عکس الگو پشتیبانی می‌کند
+        const referenceImages = inputData.imageUrls.slice(0, 3);
+        payload.image_url = referenceImages.length === 1 ? referenceImages[0] : referenceImages;
+      } else if (inputData.imageUrl) {
+        payload.image_url = inputData.imageUrl;
+      }
     } 
     else if (category === 'video') {
       finalApiUrl = 'https://api.x.ai/v1/videos/generations';
@@ -198,7 +207,7 @@ export async function POST(request: Request) {
       }
     }
 
-    // ۸. کسر موجودی و ثبت تاریخچه
+    // ۸. کسر موجودی و ثبت تاریخچه پردازش
     if (category === 'video') {
       await supabase.from('profiles').update({ 
         videos_used: profile.videos_used + 1 
