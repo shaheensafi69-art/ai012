@@ -1,4 +1,4 @@
-import type { Metadata } from "next";
+import type { Metadata, Viewport } from "next";
 import { Geist, Geist_Mono } from "next/font/google";
 import "./globals.css";
 
@@ -17,10 +17,28 @@ const geistMono = Geist_Mono({
   subsets: ["latin"],
 });
 
-// تنظیمات متادیتا برای برند Safi AI
+// ==========================================
+// تنظیمات Viewport برای PWA و رنگ مرورگر
+// ==========================================
+export const viewport: Viewport = {
+  themeColor: "#050014",
+  width: "device-width",
+  initialScale: 1,
+  maximumScale: 1,
+};
+
+// ==========================================
+// تنظیمات متادیتا و اتصال فایل Manifest برای PWA
+// ==========================================
 export const metadata: Metadata = {
   title: "SAFI AI - Future of AI Content",
   description: "Unrivaled professional cinematic video and avatar generation studio.",
+  manifest: "/manifest.json",
+  appleWebApp: {
+    capable: true,
+    statusBarStyle: "black-translucent",
+    title: "Safi AI",
+  },
 };
 
 export default function RootLayout({

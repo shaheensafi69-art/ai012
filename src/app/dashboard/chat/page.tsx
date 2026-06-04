@@ -4,7 +4,7 @@ import React, { useState, useRef, useEffect } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { 
   Send, Sparkles, Image as ImageIcon, Code2, Globe, 
-  User, Bot, Loader2, ArrowLeft, Terminal, MessageSquare, Plus, Menu, X, PanelLeftClose, PanelLeft
+  User, Bot, Loader2, ArrowLeft, Terminal, MessageSquare, Plus, Menu, X, PanelLeftClose, PanelLeft, Download
 } from 'lucide-react';
 import Link from 'next/link';
 import { supabase } from '../../../lib/supabase';
@@ -32,6 +32,7 @@ export default function NeuralChatPage() {
   const [isSidebarOpen, setIsSidebarOpen] = useState(false); // در موبایل پیش‌فرض بسته است
   const [userId, setUserId] = useState<string | null>(null);
   const [isLoadingChats, setIsLoadingChats] = useState(true);
+  const [deferredPrompt, setDeferredPrompt] = useState<any>(null); // اضافه شده برای نصب PWA
 
   const [input, setInput] = useState('');
   const [isTyping, setIsTyping] = useState(false);
@@ -53,6 +54,24 @@ export default function NeuralChatPage() {
     messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
   };
   useEffect(() => scrollToBottom(), [messages]);
+
+  // رویداد نصب وب‌اپلیکیشن PWA
+  useEffect(() => {
+    const handler = (e: any) => {
+      e.preventDefault();
+      setDeferredPrompt(e);
+    };
+    window.addEventListener('beforeinstallprompt', handler);
+    return () => window.removeEventListener('beforeinstallprompt', handler);
+  }, []);
+
+  const handleInstall = async () => {
+    if (deferredPrompt) {
+      deferredPrompt.prompt();
+      const { outcome } = await deferredPrompt.userChoice;
+      if (outcome === 'accepted') setDeferredPrompt(null);
+    }
+  };
 
   // ==========================================
   // FETCH CHATS FROM SUPABASE ON MOUNT
@@ -357,6 +376,16 @@ export default function NeuralChatPage() {
               </div>
             </div>
           </div>
+          
+          {/* دکمه نصب اپلیکیشن */}
+          {deferredPrompt && (
+            <button 
+              onClick={handleInstall}
+              className="bg-gradient-to-r from-violet-600 to-fuchsia-600 hover:from-violet-500 hover:to-fuchsia-500 text-white px-4 py-2 rounded-full text-[10px] font-black uppercase tracking-widest flex items-center gap-2 shadow-[0_0_15px_rgba(217,70,239,0.3)] transition-all"
+            >
+              <Download className="w-3 h-3" /> Install App
+            </button>
+          )}
         </header>
 
         {/* MESSAGES */}
