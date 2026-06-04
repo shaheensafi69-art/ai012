@@ -4,7 +4,7 @@ import React, { useState, useRef, useEffect } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { 
   Send, Sparkles, Image as ImageIcon, Code2, Globe, 
-  User, Bot, Loader2, ArrowLeft, Terminal, MessageSquare, Plus, Menu, X, PanelLeftClose, PanelLeft, Download
+  User, Bot, Loader2, ArrowLeft, Terminal, MessageSquare, Plus, Menu, X, PanelLeftClose, PanelLeft, Download, Paperclip
 } from 'lucide-react';
 import Link from 'next/link';
 import { supabase } from '../../../lib/supabase';
@@ -17,6 +17,7 @@ interface Message {
   role: Role;
   content: string;
   type: MessageType;
+  imageUrl?: string; // اضافه شده برای پشتیبانی از عکس‌های کاربر
 }
 
 interface ChatSession {
@@ -29,21 +30,26 @@ interface ChatSession {
 export default function NeuralChatPage() {
   const [sessions, setSessions] = useState<ChatSession[]>([]);
   const [activeSessionId, setActiveSessionId] = useState<string>('');
-  const [isSidebarOpen, setIsSidebarOpen] = useState(false); // در موبایل پیش‌فرض بسته است
+  const [isSidebarOpen, setIsSidebarOpen] = useState(false);
   const [userId, setUserId] = useState<string | null>(null);
   const [isLoadingChats, setIsLoadingChats] = useState(true);
-  const [deferredPrompt, setDeferredPrompt] = useState<any>(null); // اضافه شده برای نصب PWA
+  const [deferredPrompt, setDeferredPrompt] = useState<any>(null);
 
   const [input, setInput] = useState('');
   const [isTyping, setIsTyping] = useState(false);
   const [activeMode, setActiveMode] = useState<'chat' | 'code' | 'image' | 'search'>('chat');
   
+  // State های جدید برای دکمه پلاس و آپلود عکس
+  const [isMenuOpen, setIsMenuOpen] = useState(false);
+  const [uploadedImage, setUploadedImage] = useState<string | null>(null);
+  const [isUploading, setIsUploading] = useState(false);
+  const fileInputRef = useRef<HTMLInputElement>(null);
+
   const messagesEndRef = useRef<HTMLDivElement>(null);
 
   const activeSession = sessions.find(s => s.id === activeSessionId);
   const messages = activeSession?.messages || [];
 
-  // بررسی سایز صفحه برای باز بودن منو در دسکتاپ
   useEffect(() => {
     if (window.innerWidth >= 768) {
       setIsSidebarOpen(true);
@@ -55,7 +61,6 @@ export default function NeuralChatPage() {
   };
   useEffect(() => scrollToBottom(), [messages]);
 
-  // رویداد نصب وب‌اپلیکیشن PWA
   useEffect(() => {
     const handler = (e: any) => {
       e.preventDefault();
@@ -74,7 +79,7 @@ export default function NeuralChatPage() {
   };
 
   // ==========================================
-  // FETCH CHATS FROM SUPABASE ON MOUNT
+  // FETCH CHATS FROM SUPABASE
   // ==========================================
   useEffect(() => {
     const initializeChat = async () => {
@@ -125,8 +130,42 @@ export default function NeuralChatPage() {
   }, []);
 
   // ==========================================
-  // CREATE NEW CHAT SESSION
+  // IMAGE UPLOAD LOGIC
   // ==========================================
+  const handleFileUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+
+    if (!file.type.startsWith('image/')) {
+      alert("Please upload a valid image file.");
+      return;
+    }
+
+    setIsUploading(true);
+    try {
+      const fileExt = file.name.split('.').pop();
+      const fileName = `${userId}-chat-img-${Date.now()}.${fileExt}`;
+
+      const { error } = await supabase.storage
+        .from('ai_assets')
+        .upload(fileName, file);
+
+      if (error) throw error;
+
+      const { data: publicData } = supabase.storage
+        .from('ai_assets')
+        .getPublicUrl(fileName);
+
+      setUploadedImage(publicData.publicUrl);
+    } catch (err: any) {
+      alert(`Upload Failed: ${err.message}`);
+    } finally {
+      setIsUploading(false);
+      // پاک کردن مقدار اینپوت برای اینکه بتوان دوباره همان فایل را انتخاب کرد
+      if (fileInputRef.current) fileInputRef.current.value = '';
+    }
+  };
+
   const createNewChat = async () => {
     const newSession: ChatSession = {
       id: `session_${Date.now()}`,
@@ -150,9 +189,6 @@ export default function NeuralChatPage() {
     }
   };
 
-  // ==========================================
-  // UPDATE SESSION & SAVE TO DB
-  // ==========================================
   const updateActiveSession = async (newMessages: Message[], autoTitle?: string) => {
     if (!activeSession) return;
     
@@ -179,26 +215,27 @@ export default function NeuralChatPage() {
     }
   };
 
-  // ==========================================
-  // SEND MESSAGE LOGIC & ERROR MASKING
-  // ==========================================
   const handleSendMessage = async () => {
-    if (!input.trim() || isTyping) return;
+    if ((!input.trim() && !uploadedImage) || isTyping) return;
 
     const userMsgId = Date.now().toString();
     const newUserMessage: Message = {
       id: userMsgId,
       role: 'user',
-      content: input,
-      type: 'text'
+      content: input || 'Uploaded an image',
+      type: 'text',
+      imageUrl: uploadedImage || undefined
     };
 
     const updatedMessages = [...messages, newUserMessage];
-    const autoTitle = input.length > 25 ? input.substring(0, 25) + '...' : input;
+    const autoTitle = input.length > 25 ? input.substring(0, 25) + '...' : (input || 'Image Analysis');
     
     await updateActiveSession(updatedMessages, autoTitle);
     
+    const payloadImageUrl = uploadedImage;
     setInput('');
+    setUploadedImage(null);
+    setIsMenuOpen(false);
     setIsTyping(true);
 
     try {
@@ -210,7 +247,7 @@ export default function NeuralChatPage() {
         body: JSON.stringify({
           userId: userId || 'anonymous', 
           modelName: targetModel,
-          inputData: { prompt: newUserMessage.content, aspectRatio: '16:9' }
+          inputData: { prompt: newUserMessage.content, aspectRatio: '16:9', imageUrl: payloadImageUrl }
         })
       });
 
@@ -233,15 +270,12 @@ export default function NeuralChatPage() {
       }]);
 
     } catch (error: any) {
-      // 🚨 سیستم هوشمند فیلتر خطاها (مخفی کردن xAI)
       let finalErrorMessage = "An unexpected error occurred.";
       const rawError = (error.message || "").toLowerCase();
 
       if (rawError.includes('x.ai') || rawError.includes('credits or licenses') || rawError.includes('permission') || rawError.includes('403')) {
-        // خطای مربوط به ادمین / API کی
         finalErrorMessage = "A system error has occurred. Please try again in a few moments.";
       } else if (rawError.includes('insufficient') || rawError.includes('plan') || rawError.includes('quota') || rawError.includes('balance')) {
-        // خطای مربوط به نداشتن پلن کاربر
         finalErrorMessage = "You do not have an active plan. Please upgrade to continue.";
       } else {
         finalErrorMessage = error.message;
@@ -284,19 +318,17 @@ export default function NeuralChatPage() {
   }
 
   return (
-    // استفاده از h-[100dvh] برای حل مشکل مرورگرهای موبایل
     <div className="fixed inset-0 z-[100] flex bg-[#050014] text-slate-100 font-sans selection:bg-fuchsia-500 selection:text-white h-[100dvh] overflow-hidden">
       
-      {/* 🌌 Background Glowing Effects */}
+      {/* Hidden File Input */}
+      <input type="file" ref={fileInputRef} className="hidden" accept="image/*" onChange={handleFileUpload} />
+
       <div className="absolute inset-0 z-0 pointer-events-none overflow-hidden">
         <div className="absolute top-[-10%] left-[-10%] w-[50%] h-[50%] bg-violet-600/20 rounded-full blur-[150px]" />
         <div className="absolute bottom-[-10%] right-[-10%] w-[50%] h-[50%] bg-fuchsia-600/20 rounded-full blur-[150px]" />
         <div className="absolute top-[40%] left-[60%] w-[30%] h-[30%] bg-blue-500/10 rounded-full blur-[120px]" />
       </div>
 
-      {/* ==========================================
-          MOBILE OVERLAY (تاریک کردن پشت منو در موبایل)
-      ========================================== */}
       <AnimatePresence>
         {isSidebarOpen && (
           <motion.div 
@@ -307,14 +339,9 @@ export default function NeuralChatPage() {
         )}
       </AnimatePresence>
 
-      {/* ==========================================
-          SIDEBAR
-      ========================================== */}
-      <aside 
-        className={`absolute md:relative z-40 h-full bg-[#0A051A]/95 backdrop-blur-2xl border-r border-white/5 flex flex-col transition-transform duration-300 ease-in-out w-72 md:w-80 shadow-2xl md:shadow-none ${
+      <aside className={`absolute md:relative z-40 h-full bg-[#0A051A]/95 backdrop-blur-2xl border-r border-white/5 flex flex-col transition-transform duration-300 ease-in-out w-72 md:w-80 shadow-2xl md:shadow-none ${
           isSidebarOpen ? 'translate-x-0' : '-translate-x-full md:translate-x-0 md:w-0 md:border-none overflow-hidden'
-        }`}
-      >
+        }`}>
         <div className="p-5 border-b border-white/5 flex justify-between items-center min-w-[18rem]">
           <Link href="/dashboard" className="w-10 h-10 bg-white/5 hover:bg-white/10 rounded-full flex items-center justify-center transition-colors border border-white/5 text-neutral-400 hover:text-white">
             <ArrowLeft className="w-5 h-5" />
@@ -322,7 +349,6 @@ export default function NeuralChatPage() {
           <button onClick={createNewChat} className="flex-1 ml-3 bg-gradient-to-r from-violet-600 to-fuchsia-600 hover:from-violet-500 hover:to-fuchsia-500 text-white text-sm font-bold py-2.5 px-4 rounded-full flex items-center justify-center gap-2 transition-all shadow-[0_0_20px_rgba(167,139,250,0.3)] hover:shadow-[0_0_30px_rgba(167,139,250,0.5)]">
             <Plus className="w-4 h-4" /> New Chat
           </button>
-          
           <button onClick={() => setIsSidebarOpen(false)} className="md:hidden w-10 h-10 ml-2 bg-white/5 rounded-full flex items-center justify-center text-neutral-400 hover:text-white">
             <X className="w-5 h-5" />
           </button>
@@ -349,12 +375,7 @@ export default function NeuralChatPage() {
         </div>
       </aside>
 
-      {/* ==========================================
-          MAIN CHAT AREA
-      ========================================== */}
       <div className="flex-1 flex flex-col h-[100dvh] relative z-10 bg-transparent min-w-0">
-        
-        {/* HEADER */}
         <header className="flex items-center justify-between px-4 md:px-6 py-4 bg-[#050014]/60 backdrop-blur-xl border-b border-white/5 z-20">
           <div className="flex items-center gap-3 md:gap-4">
             <button 
@@ -377,7 +398,6 @@ export default function NeuralChatPage() {
             </div>
           </div>
           
-          {/* دکمه نصب اپلیکیشن */}
           {deferredPrompt && (
             <button 
               onClick={handleInstall}
@@ -388,16 +408,14 @@ export default function NeuralChatPage() {
           )}
         </header>
 
-        {/* MESSAGES */}
-        <main className="flex-1 overflow-y-auto p-4 md:p-8 space-y-8 scroll-smooth custom-scrollbar relative z-10 pb-4">
-          
+        <main className="flex-1 overflow-y-auto p-4 md:p-8 space-y-8 scroll-smooth custom-scrollbar relative z-10 pb-4" onClick={() => setIsMenuOpen(false)}>
           {messages.length === 0 && (
-            <div className="absolute inset-0 flex flex-col items-center justify-center opacity-80 px-4 text-center">
+            <div className="absolute inset-0 flex flex-col items-center justify-center opacity-80 px-4 text-center pointer-events-none">
               <div className="w-24 h-24 rounded-full bg-gradient-to-tr from-violet-600/20 to-fuchsia-500/20 flex items-center justify-center mb-6 border border-fuchsia-500/30 shadow-[0_0_50px_rgba(217,70,239,0.2)]">
                 <Bot className="w-12 h-12 text-fuchsia-400" />
               </div>
               <h2 className="text-3xl font-black tracking-wider text-white mb-2">How can I help?</h2>
-              <p className="text-sm font-medium text-neutral-400 max-w-md">I am your highly advanced AI assistant. Ask me anything, generate images, or write complex code.</p>
+              <p className="text-sm font-medium text-neutral-400 max-w-md">I am your highly advanced AI assistant. Ask me anything, generate images, or upload a photo to analyze.</p>
             </div>
           )}
 
@@ -410,7 +428,6 @@ export default function NeuralChatPage() {
                   key={msg.id} 
                   className={`flex gap-3 md:gap-4 ${msg.role === 'user' ? 'flex-row-reverse' : 'flex-row'}`}
                 >
-                  {/* آواتار کاملاً گرد */}
                   <div className={`w-10 h-10 md:w-12 md:h-12 rounded-full flex items-center justify-center flex-shrink-0 shadow-xl border ${
                     msg.role === 'user' 
                       ? 'bg-gradient-to-tr from-blue-500 to-cyan-400 border-white/20 text-white' 
@@ -419,12 +436,17 @@ export default function NeuralChatPage() {
                     {msg.role === 'user' ? <User className="w-5 h-5" /> : <Bot className="w-6 h-6" />}
                   </div>
 
-                  {/* باکس پیام کاملاً گرد شده */}
                   <div className={`max-w-[85%] md:max-w-[75%] rounded-[2rem] p-5 shadow-2xl ${
                     msg.role === 'user'
                       ? 'bg-gradient-to-br from-blue-600/90 to-violet-600/90 border border-white/10 text-white rounded-tr-sm'
                       : 'bg-white/5 backdrop-blur-xl border border-white/10 text-neutral-100 rounded-tl-sm'
                   }`}>
+                    
+                    {/* نمایش عکسی که کاربر فرستاده */}
+                    {msg.imageUrl && (
+                      <img src={msg.imageUrl} alt="User Upload" className="max-w-xs w-full h-auto rounded-xl mb-4 object-cover border border-white/20 shadow-md" />
+                    )}
+
                     {msg.type === 'text' && (
                       <p className="whitespace-pre-wrap leading-relaxed text-[15px]">{msg.content}</p>
                     )}
@@ -466,47 +488,89 @@ export default function NeuralChatPage() {
           </div>
         </main>
 
-        {/* INPUT AREA */}
         <footer className="p-4 md:p-6 bg-gradient-to-t from-[#050014] via-[#050014] to-transparent z-20 shrink-0">
-          <div className="max-w-4xl mx-auto">
+          <div className="max-w-4xl mx-auto relative w-full">
             
-            <div className="flex items-center gap-2 mb-4 overflow-x-auto no-scrollbar pb-2">
-              {modes.map((mode) => (
-                <button
-                  key={mode.id}
-                  onClick={() => setActiveMode(mode.id as any)}
-                  className={`flex items-center gap-2 px-5 py-2.5 rounded-full text-xs font-bold tracking-widest transition-all border whitespace-nowrap shadow-lg ${
-                    activeMode === mode.id
-                      ? 'bg-gradient-to-r from-violet-600 to-fuchsia-600 text-white border-fuchsia-500 shadow-[0_0_20px_rgba(217,70,239,0.3)]'
-                      : 'bg-white/5 text-neutral-400 border-white/5 hover:bg-white/10 hover:text-white'
-                  }`}
+            {/* Popover Menu برای مودها */}
+            <AnimatePresence>
+              {isMenuOpen && (
+                <motion.div
+                  initial={{ opacity: 0, y: 10, scale: 0.95 }}
+                  animate={{ opacity: 1, y: 0, scale: 1 }}
+                  exit={{ opacity: 0, y: 10, scale: 0.95 }}
+                  className="absolute bottom-[4.5rem] left-2 bg-[#0A051A]/95 backdrop-blur-2xl border border-white/10 p-2 rounded-2xl shadow-2xl flex flex-col gap-1 w-48 z-50"
                 >
-                  {mode.icon} {mode.label}
-                </button>
-              ))}
-            </div>
+                  {modes.map((mode) => (
+                    <button
+                      key={mode.id}
+                      onClick={() => { setActiveMode(mode.id as any); setIsMenuOpen(false); }}
+                      className={`flex items-center gap-3 px-4 py-3 rounded-xl text-xs font-bold tracking-widest transition-all ${
+                        activeMode === mode.id
+                          ? 'bg-gradient-to-r from-violet-600 to-fuchsia-600 text-white shadow-lg'
+                          : 'text-neutral-400 hover:bg-white/5 hover:text-white'
+                      }`}
+                    >
+                      {mode.icon} {mode.label}
+                    </button>
+                  ))}
+                </motion.div>
+              )}
+            </AnimatePresence>
 
-            <div className="relative flex items-end bg-[#0A051A]/90 backdrop-blur-2xl border border-white/10 rounded-[2.5rem] shadow-2xl focus-within:border-fuchsia-500/50 focus-within:shadow-[0_0_40px_rgba(217,70,239,0.15)] transition-all overflow-hidden group p-2">
+            {/* پیش‌نمایش عکس آپلود شده */}
+            <AnimatePresence>
+              {uploadedImage && (
+                <motion.div initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0, y: 10 }} className="absolute bottom-[4.5rem] left-16 bg-[#0A051A]/95 backdrop-blur-2xl border border-fuchsia-500/30 p-1.5 rounded-2xl shadow-2xl z-40">
+                  <div className="relative">
+                    <img src={uploadedImage} alt="Preview" className="h-16 w-auto rounded-xl object-cover" />
+                    <button onClick={() => setUploadedImage(null)} className="absolute -top-2 -right-2 bg-red-500 text-white rounded-full p-1 shadow-lg hover:scale-110 transition-transform">
+                      <X className="w-3 h-3" />
+                    </button>
+                  </div>
+                </motion.div>
+              )}
+            </AnimatePresence>
+
+            <div className="relative flex items-end bg-[#0A051A]/90 backdrop-blur-2xl border border-white/10 rounded-[2.5rem] shadow-2xl focus-within:border-fuchsia-500/50 focus-within:shadow-[0_0_40px_rgba(217,70,239,0.15)] transition-all group p-2">
+              
+              {/* دکمه‌های سمت چپ (Plus و Upload) */}
+              <div className="absolute bottom-3 left-3 flex items-center gap-1">
+                <button
+                  onClick={() => setIsMenuOpen(!isMenuOpen)}
+                  className={`w-10 h-10 rounded-full flex items-center justify-center transition-all duration-300 ${isMenuOpen ? 'bg-fuchsia-600 text-white rotate-45 shadow-[0_0_15px_rgba(217,70,239,0.5)]' : 'bg-white/5 text-neutral-400 hover:bg-white/10 hover:text-white'}`}
+                >
+                  <Plus className="w-5 h-5" />
+                </button>
+                <button
+                  onClick={() => fileInputRef.current?.click()}
+                  disabled={isUploading}
+                  className="w-10 h-10 rounded-full bg-white/5 text-neutral-400 hover:bg-white/10 hover:text-white flex items-center justify-center transition-all disabled:opacity-50"
+                  title="Upload Image"
+                >
+                  {isUploading ? <Loader2 className="w-4 h-4 animate-spin text-fuchsia-400" /> : <Paperclip className="w-4 h-4" />}
+                </button>
+              </div>
+
               <textarea
                 value={input}
                 onChange={(e) => setInput(e.target.value)}
                 onKeyDown={handleKeyDown}
                 placeholder={
-                  activeMode === 'chat' ? "Type a message..." :
+                  activeMode === 'chat' ? "Type a message or attach an image..." :
                   activeMode === 'code' ? "Describe the code you need..." :
                   activeMode === 'image' ? "Describe the image to generate..." :
                   "Search the web..."
                 }
-                className="w-full max-h-32 min-h-[50px] bg-transparent text-white pl-6 pr-16 py-4 resize-none focus:outline-none custom-scrollbar text-[15px] leading-relaxed"
+                className="w-full max-h-32 min-h-[50px] bg-transparent text-white pl-24 pr-16 py-4 resize-none focus:outline-none custom-scrollbar text-[15px] leading-relaxed"
                 rows={1}
                 dir="auto"
               />
               
               <button
                 onClick={handleSendMessage}
-                disabled={!input.trim() || isTyping}
+                disabled={(!input.trim() && !uploadedImage) || isTyping}
                 className={`absolute bottom-3 right-3 w-12 h-12 rounded-full flex items-center justify-center transition-all duration-300 ${
-                  input.trim() && !isTyping
+                  (input.trim() || uploadedImage) && !isTyping
                     ? 'bg-gradient-to-tr from-violet-600 to-fuchsia-600 text-white shadow-[0_0_20px_rgba(217,70,239,0.4)] hover:scale-105'
                     : 'bg-white/5 text-neutral-600 cursor-not-allowed'
                 }`}
