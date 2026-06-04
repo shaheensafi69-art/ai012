@@ -17,7 +17,8 @@ interface Message {
   role: Role;
   content: string;
   type: MessageType;
-  imageUrl?: string;
+  imageUrl?: string; // برای پشتیبانی از پیام‌های قدیمی
+  imageUrls?: string[]; // 🟢 پشتیبانی از چندین عکس
 }
 
 interface ChatSession {
@@ -34,13 +35,16 @@ export default function NeuralChatPage() {
   const [userId, setUserId] = useState<string | null>(null);
   const [isLoadingChats, setIsLoadingChats] = useState(true);
   const [deferredPrompt, setDeferredPrompt] = useState<any>(null);
+  
+  const [aiModels, setAiModels] = useState<any[]>([]);
 
   const [input, setInput] = useState('');
   const [isTyping, setIsTyping] = useState(false);
   const [activeMode, setActiveMode] = useState<'chat' | 'code' | 'image' | 'search'>('chat');
   
   const [isMenuOpen, setIsMenuOpen] = useState(false);
-  const [uploadedImage, setUploadedImage] = useState<string | null>(null);
+  // 🟢 استیت جدید: تبدیل به آرایه برای پشتیبانی از بی‌نهایت عکس
+  const [uploadedImages, setUploadedImages] = useState<string[]>([]);
   const [isUploading, setIsUploading] = useState(false);
   const fileInputRef = useRef<HTMLInputElement>(null);
 
@@ -77,9 +81,6 @@ export default function NeuralChatPage() {
     }
   };
 
-  // ==========================================
-  // FETCH CHATS FROM SUPABASE (کاملاً سینک شده با دیتابیس)
-  // ==========================================
   useEffect(() => {
     const initializeChat = async () => {
       const { data: { user } } = await supabase.auth.getUser();
@@ -87,11 +88,16 @@ export default function NeuralChatPage() {
       if (user) {
         setUserId(user.id);
         
+        const { data: pricingData } = await supabase.from('ai_pricing').select('*').eq('is_active', true);
+        if (pricingData) setAiModels(pricingData);
+
         const { data: savedSessions, error } = await supabase
           .from('chat_sessions')
           .select('*')
           .eq('user_id', user.id)
           .order('updated_at', { ascending: false });
+
+        if (error) console.error("Error fetching sessions:", error);
 
         if (savedSessions && savedSessions.length > 0) {
           const formattedSessions: ChatSession[] = savedSessions.map(dbSession => ({
@@ -128,37 +134,39 @@ export default function NeuralChatPage() {
     initializeChat();
   }, []);
 
+  // 🟢 آپدیت شده برای آپلود همزمان چندین عکس
   const handleFileUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
-    const file = e.target.files?.[0];
-    if (!file) return;
-
-    if (!file.type.startsWith('image/')) {
-      alert("Please upload a valid image file.");
-      return;
-    }
+    const files = e.target.files;
+    if (!files || files.length === 0) return;
 
     setIsUploading(true);
     try {
-      const fileExt = file.name.split('.').pop();
-      const fileName = `${userId}-chat-img-${Date.now()}.${fileExt}`;
+      const uploadPromises = Array.from(files).map(async (file) => {
+        if (!file.type.startsWith('image/')) {
+          throw new Error(`File ${file.name} is not a valid image.`);
+        }
+        const fileExt = file.name.split('.').pop();
+        const fileName = `${userId}-chat-img-${Date.now()}-${Math.random().toString(36).substring(7)}.${fileExt}`;
 
-      const { error } = await supabase.storage
-        .from('ai_assets')
-        .upload(fileName, file);
+        const { error } = await supabase.storage.from('ai_assets').upload(fileName, file);
+        if (error) throw error;
 
-      if (error) throw error;
+        const { data: publicData } = supabase.storage.from('ai_assets').getPublicUrl(fileName);
+        return publicData.publicUrl;
+      });
 
-      const { data: publicData } = supabase.storage
-        .from('ai_assets')
-        .getPublicUrl(fileName);
-
-      setUploadedImage(publicData.publicUrl);
+      const newImageUrls = await Promise.all(uploadPromises);
+      setUploadedImages(prev => [...prev, ...newImageUrls]);
     } catch (err: any) {
       alert(`Upload Failed: ${err.message}`);
     } finally {
       setIsUploading(false);
       if (fileInputRef.current) fileInputRef.current.value = '';
     }
+  };
+
+  const removeUploadedImage = (indexToRemove: number) => {
+    setUploadedImages(prev => prev.filter((_, idx) => idx !== indexToRemove));
   };
 
   const createNewChat = async () => {
@@ -200,18 +208,19 @@ export default function NeuralChatPage() {
     setSessions(prev => prev.map(s => s.id === activeSessionId ? updatedSession : s));
 
     if (userId) {
-      await supabase.from('chat_sessions').upsert({
+      const { error } = await supabase.from('chat_sessions').upsert({
         id: updatedSession.id,
         user_id: userId,
         title: updatedSession.title,
         messages: updatedSession.messages,
         updated_at: updatedSession.updatedAt
       });
+      if (error) console.error("Database Save Error:", error);
     }
   };
 
   const handleSendMessage = async () => {
-    if ((!input.trim() && !uploadedImage) || isTyping) return;
+    if ((!input.trim() && uploadedImages.length === 0) || isTyping) return;
 
     const userMsgId = Date.now().toString();
     const newUserMessage: Message = {
@@ -219,7 +228,7 @@ export default function NeuralChatPage() {
       role: 'user',
       content: input || 'Uploaded an image',
       type: 'text',
-      imageUrl: uploadedImage || undefined
+      imageUrls: uploadedImages.length > 0 ? [...uploadedImages] : undefined
     };
 
     const updatedMessages = [...messages, newUserMessage];
@@ -227,23 +236,30 @@ export default function NeuralChatPage() {
     
     await updateActiveSession(updatedMessages, autoTitle);
     
-    const payloadImageUrl = uploadedImage;
+    const payloadImageUrls = [...uploadedImages];
     setInput('');
-    setUploadedImage(null);
+    setUploadedImages([]);
     setIsMenuOpen(false);
     setIsTyping(true);
 
     try {
-      // انتخاب مدل سرور بر اساس قابلیتی که کاربر انتخاب کرده است
-      const targetModel = activeMode === 'image' ? 'grok-imagine-image' : 'grok-4.3';
+      let categoryToSearch = 'text';
+      if (activeMode === 'image') categoryToSearch = 'image';
+      
+      const targetModelConfig = aiModels.find(m => m.category.toLowerCase() === categoryToSearch);
+      
+      if (!targetModelConfig) {
+        throw new Error(`The AI Engine for ${categoryToSearch} mode was not found in your database. Please check your DB settings.`);
+      }
 
       const response = await fetch('/api/ai/generate', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           userId: userId || 'anonymous', 
-          modelName: targetModel,
-          inputData: { prompt: newUserMessage.content, aspectRatio: '16:9', imageUrl: payloadImageUrl }
+          pricingId: targetModelConfig.id,
+          // 🟢 ارسال آرایه عکس‌ها به بک‌اند
+          inputData: { prompt: newUserMessage.content, aspectRatio: '16:9', imageUrls: payloadImageUrls }
         })
       });
 
@@ -316,7 +332,8 @@ export default function NeuralChatPage() {
   return (
     <div className="fixed inset-0 z-[100] flex bg-[#050014] text-slate-100 font-sans selection:bg-fuchsia-500 selection:text-white h-[100dvh] overflow-hidden">
       
-      <input type="file" ref={fileInputRef} className="hidden" accept="image/*" onChange={handleFileUpload} />
+      {/* 🟢 اضافه شدن خاصیت multiple برای آپلود همزمان چندین عکس */}
+      <input type="file" ref={fileInputRef} className="hidden" accept="image/*" multiple onChange={handleFileUpload} />
 
       <div className="absolute inset-0 z-0 pointer-events-none overflow-hidden">
         <div className="absolute top-[-10%] left-[-10%] w-[50%] h-[50%] bg-violet-600/20 rounded-full blur-[150px]" />
@@ -410,7 +427,7 @@ export default function NeuralChatPage() {
                 <Bot className="w-10 h-10 text-fuchsia-400" />
               </div>
               <h2 className="text-2xl font-black tracking-wider text-white mb-2">How can I help?</h2>
-              <p className="text-sm font-medium text-neutral-400 max-w-sm">I am your highly advanced AI assistant. Ask me anything, generate images, or upload a photo to analyze.</p>
+              <p className="text-sm font-medium text-neutral-400 max-w-sm">I am your highly advanced AI assistant. Ask me anything, generate images, or upload photos to analyze.</p>
             </div>
           )}
 
@@ -437,7 +454,17 @@ export default function NeuralChatPage() {
                       : 'bg-white/5 backdrop-blur-xl border border-white/10 text-neutral-100 rounded-tl-sm'
                   }`}>
                     
-                    {msg.imageUrl && (
+                    {/* 🟢 نمایش پیام‌های دارای چند عکس */}
+                    {msg.imageUrls && msg.imageUrls.length > 0 && (
+                      <div className="flex flex-wrap gap-2 mb-3">
+                        {msg.imageUrls.map((img, idx) => (
+                          <img key={idx} src={img} alt="User Upload" className="max-w-[200px] w-full h-auto rounded-xl object-cover border border-white/20 shadow-md" />
+                        ))}
+                      </div>
+                    )}
+
+                    {/* پشتیبانی از پیام‌های قدیمی که یک عکس داشتند */}
+                    {msg.imageUrl && !msg.imageUrls && (
                       <img src={msg.imageUrl} alt="User Upload" className="max-w-xs w-full h-auto rounded-xl mb-3 object-cover border border-white/20 shadow-md" />
                     )}
 
@@ -498,7 +525,7 @@ export default function NeuralChatPage() {
                     disabled={isUploading}
                     className="flex items-center gap-3 px-3 py-2.5 rounded-xl text-xs font-bold tracking-wider transition-all text-fuchsia-400 hover:bg-fuchsia-500/10 mb-1 pb-3 border-b border-white/5 disabled:opacity-50"
                   >
-                    {isUploading ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <Paperclip className="w-3.5 h-3.5" />} Upload Image
+                    {isUploading ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <Paperclip className="w-3.5 h-3.5" />} Upload Images
                   </button>
                   {modes.map((mode) => (
                     <button
@@ -517,7 +544,6 @@ export default function NeuralChatPage() {
               )}
             </AnimatePresence>
 
-            {/* نشانگر قابلیت بالای چت‌بار */}
             <AnimatePresence>
               {activeMode !== 'chat' && (
                 <motion.div
@@ -537,21 +563,24 @@ export default function NeuralChatPage() {
 
             <div className="relative flex flex-col bg-[#0A051A]/90 backdrop-blur-2xl border border-white/10 rounded-[2rem] shadow-2xl focus-within:border-fuchsia-500/50 focus-within:shadow-[0_0_30px_rgba(217,70,239,0.15)] transition-all group p-1.5">
               
-              {/* پیش‌نمایش عکس آپلود شده (داخل کادر چت‌بار) */}
+              {/* 🟢 گالری عکس‌های آپلود شده در بالای چت‌بار */}
               <AnimatePresence>
-                {uploadedImage && (
+                {uploadedImages.length > 0 && (
                   <motion.div initial={{ opacity: 0, height: 0 }} animate={{ opacity: 1, height: 'auto' }} exit={{ opacity: 0, height: 0 }} className="pl-12 pt-1 pb-1">
-                    <div className="relative inline-block">
-                      <img src={uploadedImage} alt="Preview" className="h-16 w-auto rounded-lg object-cover border border-white/10 shadow-sm" />
-                      <button onClick={() => setUploadedImage(null)} className="absolute -top-2 -right-2 bg-red-500 text-white rounded-full p-1 shadow-lg hover:scale-110 transition-transform">
-                        <X className="w-3 h-3" />
-                      </button>
+                    <div className="flex gap-2 overflow-x-auto custom-scrollbar pb-1">
+                      {uploadedImages.map((img, index) => (
+                        <div key={index} className="relative inline-block shrink-0">
+                          <img src={img} alt={`Preview ${index}`} className="h-16 w-auto rounded-lg object-cover border border-white/10 shadow-sm" />
+                          <button onClick={() => removeUploadedImage(index)} className="absolute -top-2 -right-2 bg-red-500 text-white rounded-full p-1 shadow-lg hover:scale-110 transition-transform">
+                            <X className="w-3 h-3" />
+                          </button>
+                        </div>
+                      ))}
                     </div>
                   </motion.div>
                 )}
               </AnimatePresence>
 
-              {/* ردیف دکمه‌ها و کادر متن */}
               <div className="flex items-end w-full relative">
                 <div className="pb-0.5 pl-0.5 shrink-0">
                   <button
@@ -570,7 +599,7 @@ export default function NeuralChatPage() {
                     activeMode === 'code' ? "Describe the code you need..." :
                     activeMode === 'image' ? "Describe the image to generate..." :
                     activeMode === 'search' ? "Search the web..." :
-                    "Type a message or attach an image..."
+                    "Type a message or attach images..."
                   }
                   className="w-full max-h-32 min-h-[40px] bg-transparent text-white px-3 py-2 resize-none focus:outline-none custom-scrollbar text-sm leading-relaxed"
                   rows={1}
@@ -580,9 +609,9 @@ export default function NeuralChatPage() {
                 <div className="pb-0.5 pr-0.5 shrink-0">
                   <button
                     onClick={handleSendMessage}
-                    disabled={(!input.trim() && !uploadedImage) || isTyping}
+                    disabled={(!input.trim() && uploadedImages.length === 0) || isTyping}
                     className={`w-9 h-9 rounded-full flex items-center justify-center transition-all duration-300 ${
-                      (input.trim() || uploadedImage) && !isTyping
+                      (input.trim() || uploadedImages.length > 0) && !isTyping
                         ? 'bg-gradient-to-tr from-violet-600 to-fuchsia-600 text-white shadow-[0_0_15px_rgba(217,70,239,0.4)] hover:scale-105'
                         : 'bg-white/5 text-neutral-600 cursor-not-allowed'
                     }`}

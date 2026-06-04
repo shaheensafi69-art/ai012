@@ -51,13 +51,11 @@ export async function POST(request: Request) {
       return NextResponse.json({ error: 'پروفایل کاربر یافت نشد.' }, { status: 404 });
     }
 
-    // بررسی سهمیه اگر درخواست ساخت ویدیو باشد
     if (category === 'video') {
       if (profile.videos_total === 0 || profile.videos_used >= profile.videos_total) {
         return NextResponse.json({ error: 'سهمیه تولید ویدیوی شما به اتمام رسیده است. لطفا پلن خود را ارتقا دهید.' }, { status: 402 });
       }
     } else {
-      // بررسی موجودی پولی برای متن، عکس و صدا
       if (profile.credit_balance < totalCreditsNeeded) {
         return NextResponse.json({ error: 'موجودی حساب شما برای این پردازش کافی نیست.' }, { status: 402 });
       }
@@ -72,11 +70,24 @@ export async function POST(request: Request) {
     let finalApiUrl = '';
     let payload: any = {};
 
+    // ==========================================
+    // 🟢 سیستم ترجمه برندینگ به کدهای xAI
+    // ==========================================
+    let actualApiModel = pricing.model_name;
+    const dbModelNameLower = pricing.model_name.toLowerCase();
+    
+    if (dbModelNameLower.includes('video')) {
+      actualApiModel = 'grok-imagine-video';
+    } else if (dbModelNameLower.includes('image')) {
+      actualApiModel = 'grok-imagine-image';
+    } else if (dbModelNameLower.includes('chat') || dbModelNameLower.includes('text') || dbModelNameLower.includes('neural')) {
+      actualApiModel = 'grok-4.3';
+    }
+
     // ۵. تنظیم مسیرها و Payload برای xAI
     if (category === 'text') {
       finalApiUrl = 'https://api.x.ai/v1/chat/completions';
       
-      // 🟢 فعال‌سازی قابلیت Vision (تشخیص تصویر)
       let userContent: any = inputData.prompt;
       if (inputData.imageUrl) {
         userContent = [
@@ -86,7 +97,7 @@ export async function POST(request: Request) {
       }
 
       payload = {
-        model: pricing.model_name,
+        model: actualApiModel, // استفاده از نام ترجمه‌شده
         messages: [
           { 
             role: "system", 
@@ -104,7 +115,7 @@ export async function POST(request: Request) {
     else if (category === 'image') {
       finalApiUrl = 'https://api.x.ai/v1/images/generations';
       payload = {
-        model: pricing.model_name,
+        model: actualApiModel, // استفاده از نام ترجمه‌شده
         prompt: inputData.prompt,
         n: 1,
         size: inputData.aspectRatio === '16:9' ? '1920x1080' : '1024x1024'
@@ -113,7 +124,7 @@ export async function POST(request: Request) {
     else if (category === 'video') {
       finalApiUrl = 'https://api.x.ai/v1/videos/generations';
       payload = {
-        model: pricing.model_name,
+        model: actualApiModel, // استفاده از نام ترجمه‌شده
         prompt: inputData.prompt,
         duration: durationInSeconds || 5
       };
@@ -124,7 +135,7 @@ export async function POST(request: Request) {
     else if (category === 'audio') {
       finalApiUrl = 'https://api.x.ai/v1/audio/speech';
       payload = {
-        model: pricing.model_name,
+        model: actualApiModel, // استفاده از نام ترجمه‌شده
         input: inputData.prompt,
         voice: inputData.voiceUrl || 'alloy'
       };
