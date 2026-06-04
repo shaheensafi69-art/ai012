@@ -17,7 +17,7 @@ interface Message {
   role: Role;
   content: string;
   type: MessageType;
-  imageUrl?: string; // اضافه شده برای پشتیبانی از عکس‌های کاربر
+  imageUrl?: string;
 }
 
 interface ChatSession {
@@ -39,7 +39,6 @@ export default function NeuralChatPage() {
   const [isTyping, setIsTyping] = useState(false);
   const [activeMode, setActiveMode] = useState<'chat' | 'code' | 'image' | 'search'>('chat');
   
-  // State های جدید برای دکمه پلاس و آپلود عکس
   const [isMenuOpen, setIsMenuOpen] = useState(false);
   const [uploadedImage, setUploadedImage] = useState<string | null>(null);
   const [isUploading, setIsUploading] = useState(false);
@@ -161,7 +160,6 @@ export default function NeuralChatPage() {
       alert(`Upload Failed: ${err.message}`);
     } finally {
       setIsUploading(false);
-      // پاک کردن مقدار اینپوت برای اینکه بتوان دوباره همان فایل را انتخاب کرد
       if (fileInputRef.current) fileInputRef.current.value = '';
     }
   };
@@ -320,7 +318,6 @@ export default function NeuralChatPage() {
   return (
     <div className="fixed inset-0 z-[100] flex bg-[#050014] text-slate-100 font-sans selection:bg-fuchsia-500 selection:text-white h-[100dvh] overflow-hidden">
       
-      {/* Hidden File Input */}
       <input type="file" ref={fileInputRef} className="hidden" accept="image/*" onChange={handleFileUpload} />
 
       <div className="absolute inset-0 z-0 pointer-events-none overflow-hidden">
@@ -339,10 +336,10 @@ export default function NeuralChatPage() {
         )}
       </AnimatePresence>
 
-      <aside className={`absolute md:relative z-40 h-full bg-[#0A051A]/95 backdrop-blur-2xl border-r border-white/5 flex flex-col transition-transform duration-300 ease-in-out w-72 md:w-80 shadow-2xl md:shadow-none ${
-          isSidebarOpen ? 'translate-x-0' : '-translate-x-full md:translate-x-0 md:w-0 md:border-none overflow-hidden'
+      <aside className={`absolute md:relative z-40 h-full bg-[#0A051A]/95 backdrop-blur-2xl border-white/5 flex flex-col transition-all duration-300 ease-in-out shadow-2xl md:shadow-none overflow-hidden ${
+          isSidebarOpen ? 'w-72 md:w-80 translate-x-0 border-r' : 'w-0 -translate-x-full md:translate-x-0 border-none'
         }`}>
-        <div className="p-5 border-b border-white/5 flex justify-between items-center min-w-[18rem]">
+        <div className="p-5 border-b border-white/5 flex justify-between items-center w-72 md:w-80 shrink-0">
           <Link href="/dashboard" className="w-10 h-10 bg-white/5 hover:bg-white/10 rounded-full flex items-center justify-center transition-colors border border-white/5 text-neutral-400 hover:text-white">
             <ArrowLeft className="w-5 h-5" />
           </Link>
@@ -354,7 +351,7 @@ export default function NeuralChatPage() {
           </button>
         </div>
 
-        <div className="flex-1 overflow-y-auto p-4 space-y-2 custom-scrollbar min-w-[18rem]">
+        <div className="flex-1 overflow-y-auto p-4 space-y-2 custom-scrollbar w-72 md:w-80 shrink-0">
           <h3 className="text-[10px] font-black text-fuchsia-400/80 uppercase tracking-widest pl-2 mb-4 mt-2">Chat History</h3>
           {sessions.sort((a, b) => b.updatedAt - a.updatedAt).map(session => (
             <button
@@ -442,7 +439,6 @@ export default function NeuralChatPage() {
                       : 'bg-white/5 backdrop-blur-xl border border-white/10 text-neutral-100 rounded-tl-sm'
                   }`}>
                     
-                    {/* نمایش عکسی که کاربر فرستاده */}
                     {msg.imageUrl && (
                       <img src={msg.imageUrl} alt="User Upload" className="max-w-xs w-full h-auto rounded-xl mb-4 object-cover border border-white/20 shadow-md" />
                     )}
@@ -491,7 +487,6 @@ export default function NeuralChatPage() {
         <footer className="p-4 md:p-6 bg-gradient-to-t from-[#050014] via-[#050014] to-transparent z-20 shrink-0">
           <div className="max-w-4xl mx-auto relative w-full">
             
-            {/* Popover Menu برای مودها */}
             <AnimatePresence>
               {isMenuOpen && (
                 <motion.div
@@ -500,6 +495,13 @@ export default function NeuralChatPage() {
                   exit={{ opacity: 0, y: 10, scale: 0.95 }}
                   className="absolute bottom-[4.5rem] left-2 bg-[#0A051A]/95 backdrop-blur-2xl border border-white/10 p-2 rounded-2xl shadow-2xl flex flex-col gap-1 w-48 z-50"
                 >
+                  <button
+                    onClick={() => { fileInputRef.current?.click(); setIsMenuOpen(false); }}
+                    disabled={isUploading}
+                    className="flex items-center gap-3 px-4 py-3 rounded-xl text-xs font-bold tracking-widest transition-all text-fuchsia-400 hover:bg-fuchsia-500/10 mb-1 pb-3 border-b border-white/5 disabled:opacity-50"
+                  >
+                    {isUploading ? <Loader2 className="w-4 h-4 animate-spin" /> : <Paperclip className="w-4 h-4" />} Upload Image
+                  </button>
                   {modes.map((mode) => (
                     <button
                       key={mode.id}
@@ -517,7 +519,6 @@ export default function NeuralChatPage() {
               )}
             </AnimatePresence>
 
-            {/* پیش‌نمایش عکس آپلود شده */}
             <AnimatePresence>
               {uploadedImage && (
                 <motion.div initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0, y: 10 }} className="absolute bottom-[4.5rem] left-16 bg-[#0A051A]/95 backdrop-blur-2xl border border-fuchsia-500/30 p-1.5 rounded-2xl shadow-2xl z-40">
@@ -533,21 +534,12 @@ export default function NeuralChatPage() {
 
             <div className="relative flex items-end bg-[#0A051A]/90 backdrop-blur-2xl border border-white/10 rounded-[2.5rem] shadow-2xl focus-within:border-fuchsia-500/50 focus-within:shadow-[0_0_40px_rgba(217,70,239,0.15)] transition-all group p-2">
               
-              {/* دکمه‌های سمت چپ (Plus و Upload) */}
-              <div className="absolute bottom-3 left-3 flex items-center gap-1">
+              <div className="absolute bottom-3 left-3 flex items-center">
                 <button
                   onClick={() => setIsMenuOpen(!isMenuOpen)}
                   className={`w-10 h-10 rounded-full flex items-center justify-center transition-all duration-300 ${isMenuOpen ? 'bg-fuchsia-600 text-white rotate-45 shadow-[0_0_15px_rgba(217,70,239,0.5)]' : 'bg-white/5 text-neutral-400 hover:bg-white/10 hover:text-white'}`}
                 >
                   <Plus className="w-5 h-5" />
-                </button>
-                <button
-                  onClick={() => fileInputRef.current?.click()}
-                  disabled={isUploading}
-                  className="w-10 h-10 rounded-full bg-white/5 text-neutral-400 hover:bg-white/10 hover:text-white flex items-center justify-center transition-all disabled:opacity-50"
-                  title="Upload Image"
-                >
-                  {isUploading ? <Loader2 className="w-4 h-4 animate-spin text-fuchsia-400" /> : <Paperclip className="w-4 h-4" />}
                 </button>
               </div>
 
@@ -561,7 +553,7 @@ export default function NeuralChatPage() {
                   activeMode === 'image' ? "Describe the image to generate..." :
                   "Search the web..."
                 }
-                className="w-full max-h-32 min-h-[50px] bg-transparent text-white pl-24 pr-16 py-4 resize-none focus:outline-none custom-scrollbar text-[15px] leading-relaxed"
+                className="w-full max-h-32 min-h-[50px] bg-transparent text-white pl-16 pr-16 py-4 resize-none focus:outline-none custom-scrollbar text-[15px] leading-relaxed"
                 rows={1}
                 dir="auto"
               />
