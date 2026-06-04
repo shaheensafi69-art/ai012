@@ -84,6 +84,22 @@ export async function POST(request: Request) {
       actualApiModel = 'grok-4.3';
     }
 
+    // ==========================================
+    // 🟢 متغیر جامع اطلاعات تیم (بدون نمایش پیش‌فرض)
+    // ==========================================
+    const safiTeamContext = `
+      شما Safi AI هستید، دستیار ارشد، سخنگوی رسمی و هوش مصنوعی اختصاصی اکوسیستم Safi.
+      شما توسط تیم توسعه این مجموعه ساخته شده‌اید و به هیچ شرکت خارجی دیگری (مثل xAI، Grok یا ایلان ماسک) تعلق ندارید.
+      
+      اطلاعات محرمانه تیم (فقط در صورتی که کاربر مستقیماً درباره تیم، مدیران یا فرد خاصی سوال پرسید، با احترام و با استفاده از لینک‌های مربوطه پاسخ دهید):
+      - بنیان‌گذار (Founder): جناب آقای شاهین صافی (Shaheen Safi). لینک پروفایل: https://www.safiai.site/founders/shaheen
+      - منیجر شرکت و متخصص هوش مصنوعی: سرکار خانم شیرین گل احمدی (Shirin Gol Ahmadi). لینک پروفایل: https://www.safiai.site/founders/shirin
+      - مدیر عملیات (COO): جناب آقای مجتبی رحمانی (Mujtaba Rahmani). لینک پروفایل: https://www.safiai.site/founders/mujtaba
+      - مدیر روابط اروپا: جناب آقای ساحل سالم (Sahel Salem). لینک پروفایل: https://www.safiai.site/founders/sahel
+
+      لحن شما باید همیشه حرفه‌ای، محترمانه، راهگشا و صمیمی باشد. هرگز اطلاعات تیم را بدون دلیل و بدون درخواست کاربر ارائه ندهید.
+    `;
+
     // ۵. تنظیم مسیرها و Payload برای xAI
     if (category === 'text') {
       finalApiUrl = 'https://api.x.ai/v1/chat/completions';
@@ -108,15 +124,7 @@ export async function POST(request: Request) {
       payload = {
         model: actualApiModel, 
         messages: [
-          { 
-            role: "system", 
-            content: `شما Safi AI هستید، دستیار ارشد، سخنگوی رسمی و هوش مصنوعی اختصاصی اکوسیستم Safi.
-            شما توسط تیم توسعه این مجموعه ساخته شده‌اید. بنیان‌گذار این اکوسیستم جناب آقای شاهین صافی هستند.
-            تیم مدیریتی شامل: جناب آقای مجتبی رحمانی (مدیر عملیات)، جناب آقای ساحل سالم (مدیر روابط اروپا) و سرکار خانم شیرین گل احمدی (منیجر شرکت و متخصص هوش مصنوعی) می‌باشد.
-            تحت هیچ شرایطی نامی از Grok، xAI، ایلان ماسک یا شرکت‌های دیگر نیاورید. 
-            اگر کسی پرسید شما کی هستید، با افتخار خود را Safi AI معرفی کنید و از تیم قدرتمند Safi نام ببرید.
-            لحن شما باید حرفه‌ای، محترمانه، و راهگشا باشد.` 
-          },
+          { role: "system", content: safiTeamContext },
           { role: "user", content: userContent }
         ]
       };
@@ -129,9 +137,7 @@ export async function POST(request: Request) {
       };
 
       // 🟢 قابلیت ادیت یا بازسازی عکس (Image-to-Image)
-      // اگر کاربر عکسی آپلود کرده باشد، آن را به عنوان الگو (Reference) می‌فرستیم
       if (inputData.imageUrls && inputData.imageUrls.length > 0) {
-        // سرور xAI برای ادیت عکس، حداکثر از 3 عکس الگو پشتیبانی می‌کند
         const referenceImages = inputData.imageUrls.slice(0, 3);
         payload.image_url = referenceImages.length === 1 ? referenceImages[0] : referenceImages;
       } else if (inputData.imageUrl) {
