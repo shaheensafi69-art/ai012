@@ -8,13 +8,12 @@ const supabase = createClient(supabaseUrl, supabaseServiceKey);
 export async function POST(request: Request) {
   try {
     const body = await request.json();
-    // اضافه شدن modelName به پارامترهای دریافتی
     const { userId, pricingId, modelName, durationInSeconds, inputData } = body;
 
     let pricing;
     let pricingError;
 
-    // ۱. جستجوی هوشمند در دیتابیس (بر اساس نام مدل یا آیدی)
+    // ۱. جستجوی هوشمند در دیتابیس
     if (modelName) {
       const res = await supabase.from('ai_pricing').select('*').eq('model_name', modelName).single();
       pricing = res.data;
@@ -26,16 +25,14 @@ export async function POST(request: Request) {
     }
 
     if (pricingError || !pricing) {
-      return NextResponse.json({ error: 'مدل انتخاب شده در دیتابیس یافت نشد. لطفاً تنظیمات دیتابیس را بررسی کنید.' }, { status: 400 });
+      return NextResponse.json({ error: 'مدل انتخاب شده در دیتابیس یافت نشد.' }, { status: 400 });
     }
 
     const category = pricing.category.toLowerCase();
     
     // ۲. محاسبه دینامیک هزینه‌ها
     let totalCreditsNeeded = 0;
-    if (category === 'video') {
-      totalCreditsNeeded = (durationInSeconds || 5) * (pricing.credits_per_video_second || 0);
-    } else if (category === 'image') {
+    if (category === 'image') {
       totalCreditsNeeded = pricing.credits_per_image || 0;
     } else if (category === 'audio') {
       totalCreditsNeeded = (durationInSeconds || 5) * (pricing.credits_per_audio_second || 0);
@@ -43,41 +40,64 @@ export async function POST(request: Request) {
       totalCreditsNeeded = pricing.credits_per_1k_input_tokens || 1;
     }
 
-    // ۳. بررسی موجودی
-    const { data: profile } = await supabase.from('profiles').select('credit_balance').eq('id', userId).single();
-    if (!profile || profile.credit_balance < totalCreditsNeeded) {
-      return NextResponse.json({ error: 'موجودی حساب شما برای این پردازش کافی نیست.' }, { status: 402 });
+    // ۳. بررسی هوشمند موجودی (تفکیک ویدیو از بقیه)
+    const { data: profile } = await supabase
+      .from('profiles')
+      .select('credit_balance, videos_total, videos_used')
+      .eq('id', userId)
+      .single();
+
+    if (!profile) {
+      return NextResponse.json({ error: 'پروفایل کاربر یافت نشد.' }, { status: 404 });
+    }
+
+    // بررسی سهمیه اگر درخواست ساخت ویدیو باشد
+    if (category === 'video') {
+      if (profile.videos_total === 0 || profile.videos_used >= profile.videos_total) {
+        return NextResponse.json({ error: 'سهمیه تولید ویدیوی شما به اتمام رسیده است. لطفا پلن خود را ارتقا دهید.' }, { status: 402 });
+      }
+    } else {
+      // بررسی موجودی پولی برای متن، عکس و صدا
+      if (profile.credit_balance < totalCreditsNeeded) {
+        return NextResponse.json({ error: 'موجودی حساب شما برای این پردازش کافی نیست.' }, { status: 402 });
+      }
     }
 
     // ۴. اعتبارسنجی کلید API
     const XAI_API_KEY = process.env.XAI_API_KEY;
     if (!XAI_API_KEY) {
-      return NextResponse.json({ error: 'کلید امنیتی تنظیم نشده است.' }, { status: 500 });
+      return NextResponse.json({ error: 'کلید امنیتی سیستم تنظیم نشده است.' }, { status: 500 });
     }
 
     let finalApiUrl = '';
     let payload: any = {};
 
-    // ۵. تنظیم مسیرها و Payload
+    // ۵. تنظیم مسیرها و Payload برای xAI
     if (category === 'text') {
       finalApiUrl = 'https://api.x.ai/v1/chat/completions';
+      
+      // 🟢 فعال‌سازی قابلیت Vision (تشخیص تصویر)
+      let userContent: any = inputData.prompt;
+      if (inputData.imageUrl) {
+        userContent = [
+          { type: "text", text: inputData.prompt || "Please carefully analyze this image and explain what you see." },
+          { type: "image_url", image_url: { url: inputData.imageUrl } }
+        ];
+      }
+
       payload = {
         model: pricing.model_name,
         messages: [
           { 
-            // ==========================================
-            // هویت‌سازی اختصاصی SAFI AI
-            // ==========================================
             role: "system", 
             content: `شما Safi AI هستید، دستیار ارشد، سخنگوی رسمی و هوش مصنوعی اختصاصی اکوسیستم Safi.
-            شما توسط تیم توسعه این مجموعه ساخته شده‌اید.
-            بنیان‌گذار این اکوسیستم جناب آقای شاهین صافی هستند.
+            شما توسط تیم توسعه این مجموعه ساخته شده‌اید. بنیان‌گذار این اکوسیستم جناب آقای شاهین صافی هستند.
             تیم مدیریتی شامل: جناب آقای مجتبی رحمانی (مدیر عملیات)، جناب آقای ساحل سالم (مدیر روابط اروپا) و سرکار خانم شیرین گل احمدی (منیجر شرکت و متخصص هوش مصنوعی) می‌باشد.
             تحت هیچ شرایطی نامی از Grok، xAI، ایلان ماسک یا شرکت‌های دیگر نیاورید. 
-            اگر کسی پرسید شما کی هستید یا چه کسی شما را ساخته، با افتخار خود را Safi AI معرفی کنید و از تیم قدرتمند Safi نام ببرید.
-            لحن شما باید همیشه بسیار حرفه‌ای، محترمانه، خلاقانه و راهگشا باشد.` 
+            اگر کسی پرسید شما کی هستید، با افتخار خود را Safi AI معرفی کنید و از تیم قدرتمند Safi نام ببرید.
+            لحن شما باید حرفه‌ای، محترمانه، و راهگشا باشد.` 
           },
-          { role: "user", content: inputData.prompt }
+          { role: "user", content: userContent }
         ]
       };
     } 
@@ -95,6 +115,7 @@ export async function POST(request: Request) {
       payload = {
         model: pricing.model_name,
         prompt: inputData.prompt,
+        duration: durationInSeconds || 5
       };
       if (inputData.imageUrl) {
         payload.image_url = inputData.imageUrl;
@@ -109,10 +130,10 @@ export async function POST(request: Request) {
       };
     } 
     else {
-      throw new Error("دسته‌بندی مدل نامشخص است.");
+      throw new Error("دسته‌بندی مدل در دیتابیس نامشخص است.");
     }
 
-    // ۶. ارسال درخواست
+    // ۶. ارسال درخواست به سرور xAI
     const response = await fetch(finalApiUrl, {
       method: 'POST',
       headers: {
@@ -126,10 +147,10 @@ export async function POST(request: Request) {
 
     if (!response.ok) {
       console.error("AI Core Error Detail:", aiData);
-      throw new Error(`خطای پردازشی (${response.status}): ${aiData.error?.message || JSON.stringify(aiData)}`);
+      throw new Error(aiData.error?.message || JSON.stringify(aiData));
     }
 
-    // ۷. استخراج لینک یا متن
+    // ۷. استخراج لینک خروجی
     let finalOutputUrl = "";
     let status = "completed";
     let actualTokensUsed = 0;
@@ -158,10 +179,16 @@ export async function POST(request: Request) {
       }
     }
 
-    // ۸. کسر موجودی و ثبت لاگ
-    await supabase.from('profiles').update({ 
-      credit_balance: profile.credit_balance - totalCreditsNeeded 
-    }).eq('id', userId);
+    // ۸. کسر موجودی و ثبت تاریخچه
+    if (category === 'video') {
+      await supabase.from('profiles').update({ 
+        videos_used: profile.videos_used + 1 
+      }).eq('id', userId);
+    } else {
+      await supabase.from('profiles').update({ 
+        credit_balance: profile.credit_balance - totalCreditsNeeded 
+      }).eq('id', userId);
+    }
 
     await supabase.from('ai_generations').insert({
       user_id: userId,
@@ -170,18 +197,18 @@ export async function POST(request: Request) {
       status: status,
       input_params: { ...inputData, tokens_used: actualTokensUsed },
       output_url: finalOutputUrl,
-      credits_used: totalCreditsNeeded
+      credits_used: category === 'video' ? 1 : totalCreditsNeeded
     });
 
     return NextResponse.json({
       success: true,
       outputUrl: finalOutputUrl,
       status: status,
-      remainingCredits: profile.credit_balance - totalCreditsNeeded
+      remainingCredits: category === 'video' ? profile.credit_balance : profile.credit_balance - totalCreditsNeeded
     });
 
   } catch (error: any) {
     console.error('API Route Error:', error);
-    return NextResponse.json({ error: error.message || 'خطای داخلی سرور' }, { status: 500 });
+    return NextResponse.json({ error: error.message || 'خطای داخلی سرور xAI' }, { status: 500 });
   }
 }

@@ -78,7 +78,7 @@ export default function NeuralChatPage() {
   };
 
   // ==========================================
-  // FETCH CHATS FROM SUPABASE
+  // FETCH CHATS FROM SUPABASE (کاملاً سینک شده با دیتابیس)
   // ==========================================
   useEffect(() => {
     const initializeChat = async () => {
@@ -128,9 +128,6 @@ export default function NeuralChatPage() {
     initializeChat();
   }, []);
 
-  // ==========================================
-  // IMAGE UPLOAD LOGIC
-  // ==========================================
   const handleFileUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (!file) return;
@@ -237,6 +234,7 @@ export default function NeuralChatPage() {
     setIsTyping(true);
 
     try {
+      // انتخاب مدل سرور بر اساس قابلیتی که کاربر انتخاب کرده است
       const targetModel = activeMode === 'image' ? 'grok-imagine-image' : 'grok-4.3';
 
       const response = await fetch('/api/ai/generate', {
@@ -298,19 +296,19 @@ export default function NeuralChatPage() {
   };
 
   const modes = [
-    { id: 'chat', icon: <Sparkles className="w-4 h-4" />, label: 'Chat' },
-    { id: 'code', icon: <Code2 className="w-4 h-4" />, label: 'Code' },
-    { id: 'image', icon: <ImageIcon className="w-4 h-4" />, label: 'Image' },
-    { id: 'search', icon: <Globe className="w-4 h-4" />, label: 'Search' },
+    { id: 'chat', icon: <Sparkles className="w-3.5 h-3.5" />, label: 'Chat' },
+    { id: 'code', icon: <Code2 className="w-3.5 h-3.5" />, label: 'Code' },
+    { id: 'image', icon: <ImageIcon className="w-3.5 h-3.5" />, label: 'Image' },
+    { id: 'search', icon: <Globe className="w-3.5 h-3.5" />, label: 'Search' },
   ];
 
   if (isLoadingChats) {
     return (
       <div className="fixed inset-0 z-[100] flex flex-col items-center justify-center bg-[#050014]">
-        <div className="w-16 h-16 rounded-full bg-gradient-to-tr from-violet-600 to-fuchsia-500 flex items-center justify-center animate-pulse mb-4 shadow-[0_0_40px_rgba(167,139,250,0.5)]">
-          <Sparkles className="w-8 h-8 text-white" />
+        <div className="w-14 h-14 rounded-full bg-gradient-to-tr from-violet-600 to-fuchsia-500 flex items-center justify-center animate-pulse mb-4 shadow-[0_0_40px_rgba(167,139,250,0.5)]">
+          <Sparkles className="w-6 h-6 text-white" />
         </div>
-        <p className="text-white text-sm font-bold tracking-[0.2em] uppercase">Initializing Core...</p>
+        <p className="text-white text-xs font-bold tracking-[0.2em] uppercase">Initializing Core...</p>
       </div>
     );
   }
@@ -337,58 +335,58 @@ export default function NeuralChatPage() {
       </AnimatePresence>
 
       <aside className={`absolute md:relative z-40 h-full bg-[#0A051A]/95 backdrop-blur-2xl border-white/5 flex flex-col transition-all duration-300 ease-in-out shadow-2xl md:shadow-none overflow-hidden ${
-          isSidebarOpen ? 'w-72 md:w-80 translate-x-0 border-r' : 'w-0 -translate-x-full md:translate-x-0 border-none'
+          isSidebarOpen ? 'w-64 md:w-72 translate-x-0 border-r' : 'w-0 -translate-x-full md:translate-x-0 md:border-none'
         }`}>
-        <div className="p-5 border-b border-white/5 flex justify-between items-center w-72 md:w-80 shrink-0">
-          <Link href="/dashboard" className="w-10 h-10 bg-white/5 hover:bg-white/10 rounded-full flex items-center justify-center transition-colors border border-white/5 text-neutral-400 hover:text-white">
-            <ArrowLeft className="w-5 h-5" />
+        <div className="p-4 border-b border-white/5 flex justify-between items-center w-64 md:w-72 shrink-0">
+          <Link href="/dashboard" className="w-9 h-9 bg-white/5 hover:bg-white/10 rounded-full flex items-center justify-center transition-colors border border-white/5 text-neutral-400 hover:text-white">
+            <ArrowLeft className="w-4 h-4" />
           </Link>
-          <button onClick={createNewChat} className="flex-1 ml-3 bg-gradient-to-r from-violet-600 to-fuchsia-600 hover:from-violet-500 hover:to-fuchsia-500 text-white text-sm font-bold py-2.5 px-4 rounded-full flex items-center justify-center gap-2 transition-all shadow-[0_0_20px_rgba(167,139,250,0.3)] hover:shadow-[0_0_30px_rgba(167,139,250,0.5)]">
-            <Plus className="w-4 h-4" /> New Chat
+          <button onClick={createNewChat} className="flex-1 ml-2 bg-gradient-to-r from-violet-600 to-fuchsia-600 hover:from-violet-500 hover:to-fuchsia-500 text-white text-xs font-bold py-2.5 px-3 rounded-full flex items-center justify-center gap-2 transition-all shadow-[0_0_20px_rgba(167,139,250,0.3)] hover:shadow-[0_0_30px_rgba(167,139,250,0.5)]">
+            <Plus className="w-3.5 h-3.5" /> New Chat
           </button>
-          <button onClick={() => setIsSidebarOpen(false)} className="md:hidden w-10 h-10 ml-2 bg-white/5 rounded-full flex items-center justify-center text-neutral-400 hover:text-white">
-            <X className="w-5 h-5" />
+          <button onClick={() => setIsSidebarOpen(false)} className="md:hidden w-9 h-9 ml-2 bg-white/5 rounded-full flex items-center justify-center text-neutral-400 hover:text-white">
+            <X className="w-4 h-4" />
           </button>
         </div>
 
-        <div className="flex-1 overflow-y-auto p-4 space-y-2 custom-scrollbar w-72 md:w-80 shrink-0">
-          <h3 className="text-[10px] font-black text-fuchsia-400/80 uppercase tracking-widest pl-2 mb-4 mt-2">Chat History</h3>
+        <div className="flex-1 overflow-y-auto p-3 space-y-1.5 custom-scrollbar w-64 md:w-72 shrink-0">
+          <h3 className="text-[10px] font-black text-fuchsia-400/80 uppercase tracking-widest pl-2 mb-3 mt-2">Chat History</h3>
           {sessions.sort((a, b) => b.updatedAt - a.updatedAt).map(session => (
             <button
               key={session.id}
               onClick={() => { setActiveSessionId(session.id); if(window.innerWidth < 768) setIsSidebarOpen(false); }}
-              className={`w-full text-left px-4 py-3.5 rounded-2xl text-sm flex items-center gap-3 transition-all truncate group ${
+              className={`w-full text-left px-3 py-3 rounded-2xl text-sm flex items-center gap-3 transition-all truncate group ${
                 activeSessionId === session.id 
                   ? 'bg-white/10 text-white shadow-lg border border-white/10' 
                   : 'text-neutral-400 hover:bg-white/5 hover:text-white'
               }`}
             >
-              <div className={`w-8 h-8 rounded-full flex items-center justify-center transition-colors ${activeSessionId === session.id ? 'bg-fuchsia-500 text-white shadow-[0_0_15px_rgba(217,70,239,0.5)]' : 'bg-white/5 text-neutral-500 group-hover:bg-white/10 group-hover:text-white'}`}>
-                <MessageSquare className="w-4 h-4" />
+              <div className={`w-7 h-7 rounded-full flex items-center justify-center shrink-0 transition-colors ${activeSessionId === session.id ? 'bg-fuchsia-500 text-white shadow-[0_0_15px_rgba(217,70,239,0.5)]' : 'bg-white/5 text-neutral-500 group-hover:bg-white/10 group-hover:text-white'}`}>
+                <MessageSquare className="w-3.5 h-3.5" />
               </div>
-              <span className="truncate font-medium">{session.title}</span>
+              <span className="truncate text-[13px] font-medium">{session.title}</span>
             </button>
           ))}
         </div>
       </aside>
 
       <div className="flex-1 flex flex-col h-[100dvh] relative z-10 bg-transparent min-w-0">
-        <header className="flex items-center justify-between px-4 md:px-6 py-4 bg-[#050014]/60 backdrop-blur-xl border-b border-white/5 z-20">
-          <div className="flex items-center gap-3 md:gap-4">
+        <header className="flex items-center justify-between px-4 md:px-6 py-3.5 bg-[#050014]/60 backdrop-blur-xl border-b border-white/5 z-20">
+          <div className="flex items-center gap-3">
             <button 
               onClick={() => setIsSidebarOpen(!isSidebarOpen)} 
-              className="w-10 h-10 flex items-center justify-center text-neutral-300 hover:text-white bg-white/5 hover:bg-white/10 rounded-full transition-colors border border-white/5"
+              className="w-9 h-9 flex items-center justify-center text-neutral-300 hover:text-white bg-white/5 hover:bg-white/10 rounded-full transition-colors border border-white/5"
             >
-              {isSidebarOpen ? <PanelLeftClose className="w-5 h-5 hidden md:block" /> : <PanelLeft className="w-5 h-5 hidden md:block" />}
-              <Menu className="w-5 h-5 md:hidden" />
+              {isSidebarOpen ? <PanelLeftClose className="w-4 h-4 hidden md:block" /> : <PanelLeft className="w-4 h-4 hidden md:block" />}
+              <Menu className="w-4 h-4 md:hidden" />
             </button>
-            <div className="flex items-center gap-3">
-              <div className="w-10 h-10 rounded-full bg-gradient-to-tr from-violet-600 to-fuchsia-500 flex items-center justify-center shadow-lg">
-                <Sparkles className="w-5 h-5 text-white" />
+            <div className="flex items-center gap-2.5">
+              <div className="w-9 h-9 rounded-full bg-gradient-to-tr from-violet-600 to-fuchsia-500 flex items-center justify-center shadow-lg">
+                <Sparkles className="w-4 h-4 text-white" />
               </div>
               <div>
-                <h1 className="text-base md:text-lg font-black tracking-wide text-white">SAFI Neural</h1>
-                <p className="text-[10px] font-bold tracking-[0.2em] text-fuchsia-400 uppercase flex items-center gap-1.5">
+                <h1 className="text-[15px] font-black tracking-wide text-white leading-tight">SAFI Neural</h1>
+                <p className="text-[9px] font-bold tracking-[0.2em] text-fuchsia-400 uppercase flex items-center gap-1.5">
                   <span className="w-1.5 h-1.5 rounded-full bg-emerald-400 animate-pulse shadow-[0_0_10px_#34d399]" /> Active
                 </p>
               </div>
@@ -398,68 +396,68 @@ export default function NeuralChatPage() {
           {deferredPrompt && (
             <button 
               onClick={handleInstall}
-              className="bg-gradient-to-r from-violet-600 to-fuchsia-600 hover:from-violet-500 hover:to-fuchsia-500 text-white px-4 py-2 rounded-full text-[10px] font-black uppercase tracking-widest flex items-center gap-2 shadow-[0_0_15px_rgba(217,70,239,0.3)] transition-all"
+              className="bg-gradient-to-r from-violet-600 to-fuchsia-600 hover:from-violet-500 hover:to-fuchsia-500 text-white px-3 py-1.5 rounded-full text-[10px] font-black uppercase tracking-widest flex items-center gap-1.5 shadow-[0_0_15px_rgba(217,70,239,0.3)] transition-all"
             >
               <Download className="w-3 h-3" /> Install App
             </button>
           )}
         </header>
 
-        <main className="flex-1 overflow-y-auto p-4 md:p-8 space-y-8 scroll-smooth custom-scrollbar relative z-10 pb-4" onClick={() => setIsMenuOpen(false)}>
+        <main className="flex-1 overflow-y-auto p-4 md:p-6 space-y-6 scroll-smooth custom-scrollbar relative z-10 pb-4" onClick={() => setIsMenuOpen(false)}>
           {messages.length === 0 && (
             <div className="absolute inset-0 flex flex-col items-center justify-center opacity-80 px-4 text-center pointer-events-none">
-              <div className="w-24 h-24 rounded-full bg-gradient-to-tr from-violet-600/20 to-fuchsia-500/20 flex items-center justify-center mb-6 border border-fuchsia-500/30 shadow-[0_0_50px_rgba(217,70,239,0.2)]">
-                <Bot className="w-12 h-12 text-fuchsia-400" />
+              <div className="w-20 h-20 rounded-full bg-gradient-to-tr from-violet-600/20 to-fuchsia-500/20 flex items-center justify-center mb-5 border border-fuchsia-500/30 shadow-[0_0_40px_rgba(217,70,239,0.2)]">
+                <Bot className="w-10 h-10 text-fuchsia-400" />
               </div>
-              <h2 className="text-3xl font-black tracking-wider text-white mb-2">How can I help?</h2>
-              <p className="text-sm font-medium text-neutral-400 max-w-md">I am your highly advanced AI assistant. Ask me anything, generate images, or upload a photo to analyze.</p>
+              <h2 className="text-2xl font-black tracking-wider text-white mb-2">How can I help?</h2>
+              <p className="text-sm font-medium text-neutral-400 max-w-sm">I am your highly advanced AI assistant. Ask me anything, generate images, or upload a photo to analyze.</p>
             </div>
           )}
 
-          <div className="max-w-4xl mx-auto space-y-8 relative z-20">
+          <div className="max-w-3xl mx-auto space-y-6 relative z-20">
             <AnimatePresence>
               {messages.map((msg) => (
                 <motion.div 
                   initial={{ opacity: 0, scale: 0.95, y: 10 }}
                   animate={{ opacity: 1, scale: 1, y: 0 }}
                   key={msg.id} 
-                  className={`flex gap-3 md:gap-4 ${msg.role === 'user' ? 'flex-row-reverse' : 'flex-row'}`}
+                  className={`flex gap-3 ${msg.role === 'user' ? 'flex-row-reverse' : 'flex-row'}`}
                 >
-                  <div className={`w-10 h-10 md:w-12 md:h-12 rounded-full flex items-center justify-center flex-shrink-0 shadow-xl border ${
+                  <div className={`w-9 h-9 rounded-full flex items-center justify-center flex-shrink-0 shadow-lg border ${
                     msg.role === 'user' 
                       ? 'bg-gradient-to-tr from-blue-500 to-cyan-400 border-white/20 text-white' 
                       : 'bg-gradient-to-tr from-violet-600 to-fuchsia-600 border-white/20 text-white'
                   }`}>
-                    {msg.role === 'user' ? <User className="w-5 h-5" /> : <Bot className="w-6 h-6" />}
+                    {msg.role === 'user' ? <User className="w-4 h-4" /> : <Bot className="w-5 h-5" />}
                   </div>
 
-                  <div className={`max-w-[85%] md:max-w-[75%] rounded-[2rem] p-5 shadow-2xl ${
+                  <div className={`max-w-[85%] rounded-[1.5rem] p-4 shadow-xl ${
                     msg.role === 'user'
                       ? 'bg-gradient-to-br from-blue-600/90 to-violet-600/90 border border-white/10 text-white rounded-tr-sm'
                       : 'bg-white/5 backdrop-blur-xl border border-white/10 text-neutral-100 rounded-tl-sm'
                   }`}>
                     
                     {msg.imageUrl && (
-                      <img src={msg.imageUrl} alt="User Upload" className="max-w-xs w-full h-auto rounded-xl mb-4 object-cover border border-white/20 shadow-md" />
+                      <img src={msg.imageUrl} alt="User Upload" className="max-w-xs w-full h-auto rounded-xl mb-3 object-cover border border-white/20 shadow-md" />
                     )}
 
                     {msg.type === 'text' && (
-                      <p className="whitespace-pre-wrap leading-relaxed text-[15px]">{msg.content}</p>
+                      <p className="whitespace-pre-wrap leading-relaxed text-sm">{msg.content}</p>
                     )}
 
                     {msg.type === 'code' && (
-                      <div className="bg-[#03000A] rounded-2xl border border-white/10 overflow-hidden font-mono text-sm mt-3 shadow-inner">
-                        <div className="flex items-center justify-between px-5 py-3 bg-white/5 border-b border-white/5 text-neutral-400">
-                          <span className="flex items-center gap-2 text-xs uppercase tracking-widest text-fuchsia-400 font-bold"><Terminal className="w-4 h-4"/> Code Snippet</span>
+                      <div className="bg-[#03000A] rounded-xl border border-white/10 overflow-hidden font-mono text-xs mt-3 shadow-inner">
+                        <div className="flex items-center justify-between px-4 py-2 bg-white/5 border-b border-white/5 text-neutral-400">
+                          <span className="flex items-center gap-2 text-[10px] uppercase tracking-widest text-fuchsia-400 font-bold"><Terminal className="w-3 h-3"/> Code Snippet</span>
                         </div>
-                        <pre className="p-5 overflow-x-auto text-cyan-300">
+                        <pre className="p-4 overflow-x-auto text-cyan-300">
                           <code>{msg.content}</code>
                         </pre>
                       </div>
                     )}
 
                     {msg.type === 'image' && (
-                      <div className="mt-3 rounded-2xl overflow-hidden border border-white/10 bg-[#03000A] shadow-lg">
+                      <div className="mt-2 rounded-xl overflow-hidden border border-white/10 bg-[#03000A] shadow-md">
                         <img src={msg.content} alt="SAFI AI Generated" className="w-full h-auto object-cover" />
                       </div>
                     )}
@@ -469,14 +467,14 @@ export default function NeuralChatPage() {
             </AnimatePresence>
 
             {isTyping && (
-              <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} className="flex gap-3 md:gap-4">
-                <div className="w-10 h-10 md:w-12 md:h-12 rounded-full bg-gradient-to-tr from-violet-600 to-fuchsia-600 border border-white/20 text-white flex items-center justify-center shadow-lg">
-                  <Loader2 className="w-5 h-5 animate-spin" />
+              <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} className="flex gap-3">
+                <div className="w-9 h-9 rounded-full bg-gradient-to-tr from-violet-600 to-fuchsia-600 border border-white/20 text-white flex items-center justify-center shadow-lg">
+                  <Loader2 className="w-4 h-4 animate-spin" />
                 </div>
-                <div className="bg-white/5 backdrop-blur-xl border border-white/10 rounded-[2rem] rounded-tl-sm px-6 py-5 flex items-center gap-2 shadow-2xl h-14">
-                  <span className="w-2.5 h-2.5 rounded-full bg-fuchsia-500 animate-bounce" style={{ animationDelay: '0ms' }} />
-                  <span className="w-2.5 h-2.5 rounded-full bg-violet-500 animate-bounce" style={{ animationDelay: '150ms' }} />
-                  <span className="w-2.5 h-2.5 rounded-full bg-blue-500 animate-bounce" style={{ animationDelay: '300ms' }} />
+                <div className="bg-white/5 backdrop-blur-xl border border-white/10 rounded-[1.5rem] rounded-tl-sm px-5 py-4 flex items-center gap-1.5 shadow-xl h-12">
+                  <span className="w-2 h-2 rounded-full bg-fuchsia-500 animate-bounce" style={{ animationDelay: '0ms' }} />
+                  <span className="w-2 h-2 rounded-full bg-violet-500 animate-bounce" style={{ animationDelay: '150ms' }} />
+                  <span className="w-2 h-2 rounded-full bg-blue-500 animate-bounce" style={{ animationDelay: '300ms' }} />
                 </div>
               </motion.div>
             )}
@@ -484,8 +482,8 @@ export default function NeuralChatPage() {
           </div>
         </main>
 
-        <footer className="p-4 md:p-6 bg-gradient-to-t from-[#050014] via-[#050014] to-transparent z-20 shrink-0">
-          <div className="max-w-4xl mx-auto relative w-full">
+        <footer className="p-3 md:p-5 bg-gradient-to-t from-[#050014] via-[#050014] to-transparent z-20 shrink-0">
+          <div className="max-w-3xl mx-auto relative w-full">
             
             <AnimatePresence>
               {isMenuOpen && (
@@ -493,20 +491,20 @@ export default function NeuralChatPage() {
                   initial={{ opacity: 0, y: 10, scale: 0.95 }}
                   animate={{ opacity: 1, y: 0, scale: 1 }}
                   exit={{ opacity: 0, y: 10, scale: 0.95 }}
-                  className="absolute bottom-[4.5rem] left-2 bg-[#0A051A]/95 backdrop-blur-2xl border border-white/10 p-2 rounded-2xl shadow-2xl flex flex-col gap-1 w-48 z-50"
+                  className="absolute bottom-[4.5rem] left-2 bg-[#0A051A]/95 backdrop-blur-2xl border border-white/10 p-2 rounded-2xl shadow-2xl flex flex-col gap-1 w-44 z-50"
                 >
                   <button
                     onClick={() => { fileInputRef.current?.click(); setIsMenuOpen(false); }}
                     disabled={isUploading}
-                    className="flex items-center gap-3 px-4 py-3 rounded-xl text-xs font-bold tracking-widest transition-all text-fuchsia-400 hover:bg-fuchsia-500/10 mb-1 pb-3 border-b border-white/5 disabled:opacity-50"
+                    className="flex items-center gap-3 px-3 py-2.5 rounded-xl text-xs font-bold tracking-wider transition-all text-fuchsia-400 hover:bg-fuchsia-500/10 mb-1 pb-3 border-b border-white/5 disabled:opacity-50"
                   >
-                    {isUploading ? <Loader2 className="w-4 h-4 animate-spin" /> : <Paperclip className="w-4 h-4" />} Upload Image
+                    {isUploading ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <Paperclip className="w-3.5 h-3.5" />} Upload Image
                   </button>
                   {modes.map((mode) => (
                     <button
                       key={mode.id}
                       onClick={() => { setActiveMode(mode.id as any); setIsMenuOpen(false); }}
-                      className={`flex items-center gap-3 px-4 py-3 rounded-xl text-xs font-bold tracking-widest transition-all ${
+                      className={`flex items-center gap-3 px-3 py-2.5 rounded-xl text-xs font-bold tracking-wider transition-all ${
                         activeMode === mode.id
                           ? 'bg-gradient-to-r from-violet-600 to-fuchsia-600 text-white shadow-lg'
                           : 'text-neutral-400 hover:bg-white/5 hover:text-white'
@@ -519,60 +517,84 @@ export default function NeuralChatPage() {
               )}
             </AnimatePresence>
 
+            {/* نشانگر قابلیت بالای چت‌بار */}
             <AnimatePresence>
-              {uploadedImage && (
-                <motion.div initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0, y: 10 }} className="absolute bottom-[4.5rem] left-16 bg-[#0A051A]/95 backdrop-blur-2xl border border-fuchsia-500/30 p-1.5 rounded-2xl shadow-2xl z-40">
-                  <div className="relative">
-                    <img src={uploadedImage} alt="Preview" className="h-16 w-auto rounded-xl object-cover" />
-                    <button onClick={() => setUploadedImage(null)} className="absolute -top-2 -right-2 bg-red-500 text-white rounded-full p-1 shadow-lg hover:scale-110 transition-transform">
-                      <X className="w-3 h-3" />
-                    </button>
-                  </div>
+              {activeMode !== 'chat' && (
+                <motion.div
+                  initial={{ opacity: 0, y: 10 }}
+                  animate={{ opacity: 1, y: 0 }}
+                  exit={{ opacity: 0, y: 10 }}
+                  className="absolute -top-10 left-3 bg-gradient-to-r from-fuchsia-600/20 to-violet-600/20 border border-fuchsia-500/30 text-fuchsia-300 px-3 py-1.5 rounded-full text-[11px] font-bold flex items-center gap-2 backdrop-blur-md shadow-lg z-30"
+                >
+                  {modes.find(m => m.id === activeMode)?.icon}
+                  {modes.find(m => m.id === activeMode)?.label} Mode Active
+                  <button onClick={() => setActiveMode('chat')} className="ml-1 bg-black/30 rounded-full p-0.5 hover:bg-black/50 transition-colors">
+                    <X className="w-3 h-3" />
+                  </button>
                 </motion.div>
               )}
             </AnimatePresence>
 
-            <div className="relative flex items-end bg-[#0A051A]/90 backdrop-blur-2xl border border-white/10 rounded-[2.5rem] shadow-2xl focus-within:border-fuchsia-500/50 focus-within:shadow-[0_0_40px_rgba(217,70,239,0.15)] transition-all group p-2">
+            <div className="relative flex flex-col bg-[#0A051A]/90 backdrop-blur-2xl border border-white/10 rounded-[2rem] shadow-2xl focus-within:border-fuchsia-500/50 focus-within:shadow-[0_0_30px_rgba(217,70,239,0.15)] transition-all group p-1.5">
               
-              <div className="absolute bottom-3 left-3 flex items-center">
-                <button
-                  onClick={() => setIsMenuOpen(!isMenuOpen)}
-                  className={`w-10 h-10 rounded-full flex items-center justify-center transition-all duration-300 ${isMenuOpen ? 'bg-fuchsia-600 text-white rotate-45 shadow-[0_0_15px_rgba(217,70,239,0.5)]' : 'bg-white/5 text-neutral-400 hover:bg-white/10 hover:text-white'}`}
-                >
-                  <Plus className="w-5 h-5" />
-                </button>
-              </div>
+              {/* پیش‌نمایش عکس آپلود شده (داخل کادر چت‌بار) */}
+              <AnimatePresence>
+                {uploadedImage && (
+                  <motion.div initial={{ opacity: 0, height: 0 }} animate={{ opacity: 1, height: 'auto' }} exit={{ opacity: 0, height: 0 }} className="pl-12 pt-1 pb-1">
+                    <div className="relative inline-block">
+                      <img src={uploadedImage} alt="Preview" className="h-16 w-auto rounded-lg object-cover border border-white/10 shadow-sm" />
+                      <button onClick={() => setUploadedImage(null)} className="absolute -top-2 -right-2 bg-red-500 text-white rounded-full p-1 shadow-lg hover:scale-110 transition-transform">
+                        <X className="w-3 h-3" />
+                      </button>
+                    </div>
+                  </motion.div>
+                )}
+              </AnimatePresence>
 
-              <textarea
-                value={input}
-                onChange={(e) => setInput(e.target.value)}
-                onKeyDown={handleKeyDown}
-                placeholder={
-                  activeMode === 'chat' ? "Type a message or attach an image..." :
-                  activeMode === 'code' ? "Describe the code you need..." :
-                  activeMode === 'image' ? "Describe the image to generate..." :
-                  "Search the web..."
-                }
-                className="w-full max-h-32 min-h-[50px] bg-transparent text-white pl-16 pr-16 py-4 resize-none focus:outline-none custom-scrollbar text-[15px] leading-relaxed"
-                rows={1}
-                dir="auto"
-              />
-              
-              <button
-                onClick={handleSendMessage}
-                disabled={(!input.trim() && !uploadedImage) || isTyping}
-                className={`absolute bottom-3 right-3 w-12 h-12 rounded-full flex items-center justify-center transition-all duration-300 ${
-                  (input.trim() || uploadedImage) && !isTyping
-                    ? 'bg-gradient-to-tr from-violet-600 to-fuchsia-600 text-white shadow-[0_0_20px_rgba(217,70,239,0.4)] hover:scale-105'
-                    : 'bg-white/5 text-neutral-600 cursor-not-allowed'
-                }`}
-              >
-                <Send className="w-5 h-5 ml-1" />
-              </button>
+              {/* ردیف دکمه‌ها و کادر متن */}
+              <div className="flex items-end w-full relative">
+                <div className="pb-0.5 pl-0.5 shrink-0">
+                  <button
+                    onClick={() => setIsMenuOpen(!isMenuOpen)}
+                    className={`w-9 h-9 rounded-full flex items-center justify-center transition-all duration-300 ${isMenuOpen ? 'bg-fuchsia-600 text-white rotate-45 shadow-[0_0_10px_rgba(217,70,239,0.5)]' : 'bg-white/5 text-neutral-400 hover:bg-white/10 hover:text-white'}`}
+                  >
+                    <Plus className="w-5 h-5" />
+                  </button>
+                </div>
+
+                <textarea
+                  value={input}
+                  onChange={(e) => setInput(e.target.value)}
+                  onKeyDown={handleKeyDown}
+                  placeholder={
+                    activeMode === 'code' ? "Describe the code you need..." :
+                    activeMode === 'image' ? "Describe the image to generate..." :
+                    activeMode === 'search' ? "Search the web..." :
+                    "Type a message or attach an image..."
+                  }
+                  className="w-full max-h-32 min-h-[40px] bg-transparent text-white px-3 py-2 resize-none focus:outline-none custom-scrollbar text-sm leading-relaxed"
+                  rows={1}
+                  dir="auto"
+                />
+                
+                <div className="pb-0.5 pr-0.5 shrink-0">
+                  <button
+                    onClick={handleSendMessage}
+                    disabled={(!input.trim() && !uploadedImage) || isTyping}
+                    className={`w-9 h-9 rounded-full flex items-center justify-center transition-all duration-300 ${
+                      (input.trim() || uploadedImage) && !isTyping
+                        ? 'bg-gradient-to-tr from-violet-600 to-fuchsia-600 text-white shadow-[0_0_15px_rgba(217,70,239,0.4)] hover:scale-105'
+                        : 'bg-white/5 text-neutral-600 cursor-not-allowed'
+                    }`}
+                  >
+                    <Send className="w-4 h-4 ml-0.5" />
+                  </button>
+                </div>
+              </div>
             </div>
             
-            <div className="text-center mt-4 hidden md:block">
-              <p className="text-[10px] text-neutral-600 font-mono tracking-widest uppercase">
+            <div className="text-center mt-3 hidden md:block">
+              <p className="text-[9px] text-neutral-600 font-mono tracking-widest uppercase">
                 Powered by SAFI Neural Engine • End-to-End Encrypted
               </p>
             </div>
@@ -581,7 +603,7 @@ export default function NeuralChatPage() {
       </div>
 
       <style dangerouslySetInnerHTML={{__html: `
-        .custom-scrollbar::-webkit-scrollbar { width: 4px; height: 4px; }
+        .custom-scrollbar::-webkit-scrollbar { width: 3px; height: 3px; }
         .custom-scrollbar::-webkit-scrollbar-track { background: transparent; }
         .custom-scrollbar::-webkit-scrollbar-thumb { background: rgba(255,255,255,0.15); border-radius: 20px; }
         .custom-scrollbar::-webkit-scrollbar-thumb:hover { background: rgba(217,70,239,0.5); }
