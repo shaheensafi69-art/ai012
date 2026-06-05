@@ -4,7 +4,8 @@ import React, { useState, useEffect, useRef } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { 
   Video, Zap, Sliders, Eye, Download, RefreshCw, 
-  History, CheckCircle2, Upload, Cpu, ArrowLeft, Film, AlertTriangle, ShieldAlert
+  History, CheckCircle2, Upload, Cpu, ArrowLeft, Film, AlertTriangle, ShieldAlert,
+  Monitor
 } from 'lucide-react';
 import Link from 'next/link';
 import { supabase } from '../../../lib/supabase';
@@ -19,8 +20,12 @@ const LOADING_MESSAGES = [
   "Finalizing Container Packaging..."
 ];
 
+const ASPECT_RATIOS = [
+  '1:1', '3:4', '4:3', '9:16', '16:9', '2:3', '3:2', 
+  '9:19.5', '19.5:9', '9:20', '20:9', '1:2', '2:1'
+];
+
 export default function VideoGeneratorPage() {
-  // Global States
   const [userId, setUserId] = useState<string | null>(null);
   const [planName, setPlanName] = useState<string>('Free');
   const [videosTotal, setVideosTotal] = useState<number>(0);
@@ -30,15 +35,16 @@ export default function VideoGeneratorPage() {
   const [selectedModel, setSelectedModel] = useState<any>(null);
   const [historyData, setHistoryData] = useState<any[]>([]);
 
-  // Configuration States
   const [videoMode, setVideoMode] = useState<'text' | 'image'>('text');
   const [prompt, setPrompt] = useState('');
   const [imageUrl, setImageUrl] = useState<string | null>(null);
+  
+  // ================= پارامترهای جدید و آپدیت شده =================
   const [motionStrength, setMotionStrength] = useState(50);
   const [aspectRatio, setAspectRatio] = useState('16:9');
-  const [renderDuration, setRenderDuration] = useState(10);
+  const [renderDuration, setRenderDuration] = useState(5); // ۱ الی ۱۵ ثانیه
+  const [resolution, setResolution] = useState<'480p' | '720p'>('720p'); // کیفیت ویدیو
 
-  // Status & Safety States
   const fileInputRef = useRef<HTMLInputElement>(null);
   const pollingIntervalRef = useRef<NodeJS.Timeout | null>(null);
   const [isUploading, setIsUploading] = useState(false);
@@ -49,7 +55,6 @@ export default function VideoGeneratorPage() {
   const [outputVideoUrl, setOutputVideoUrl] = useState<string | null>(null);
   const [uiError, setUiError] = useState<string | null>(null);
   
-  // 🟢 استیت جدید: کنترل اینکه آیا کاربر یک بار ریجنریت کرده است یا خیر
   const [canRegenerate, setCanRegenerate] = useState(true);
 
   useEffect(() => {
@@ -125,16 +130,10 @@ export default function VideoGeneratorPage() {
       const fileExt = file.name.split('.').pop();
       const fileName = `${userId}-video-frame-${Date.now()}.${fileExt}`;
 
-      const { data, error } = await supabase.storage
-        .from('ai_assets')
-        .upload(fileName, file);
-
+      const { error } = await supabase.storage.from('ai_assets').upload(fileName, file);
       if (error) throw error;
 
-      const { data: publicData } = supabase.storage
-        .from('ai_assets')
-        .getPublicUrl(fileName);
-
+      const { data: publicData } = supabase.storage.from('ai_assets').getPublicUrl(fileName);
       setImageUrl(publicData.publicUrl);
     } catch (err: any) {
       setUiError(`Upload Error: ${err.message}`);
@@ -164,7 +163,7 @@ export default function VideoGeneratorPage() {
         if (statusData.success && statusData.status === 'completed') {
           if (pollingIntervalRef.current) clearInterval(pollingIntervalRef.current);
           setProgress(100);
-          setOutputVideoUrl(statusData.videoUrl);
+          setOutputVideoUrl(statusData.outputUrl); // اطمینان از استفاده نام درست متغیر
           setIsRendering(false);
           setRenderComplete(true);
           
@@ -174,7 +173,7 @@ export default function VideoGeneratorPage() {
           ].slice(0, 5));
         } else if (statusData.status === 'failed') {
           if (pollingIntervalRef.current) clearInterval(pollingIntervalRef.current);
-          setUiError("Video generation failed at the AI core. Please try again.");
+          setUiError(statusData.errorDetails || "Video generation failed at the AI core. Please try again.");
           setIsRendering(false);
         }
       } catch (err) {
@@ -183,7 +182,6 @@ export default function VideoGeneratorPage() {
     }, 6000); 
   };
 
-  // 🟢 لاجیک مجزا شده برای ارسال تا بتوان در حالت Regenerate هم از آن استفاده کرد
   const executeGeneration = async (isRegen: boolean = false) => {
     setUiError(null);
 
@@ -193,13 +191,7 @@ export default function VideoGeneratorPage() {
     if (videoMode === 'text' && !prompt.trim()) return setUiError("Prompt description is required.");
     if (videoMode === 'image' && !imageUrl) return setUiError("Base image is required for Image-to-Video.");
 
-    // تنظیم قابلیت ریجنریت: اگر الان دارد ریجنریت می‌کند، دفعات بعد خاموش شود. اگر ران اول است، روشن باشد.
-    if (isRegen) {
-      setCanRegenerate(false);
-    } else {
-      setCanRegenerate(true);
-    }
-
+    setCanRegenerate(!isRegen);
     setIsRendering(true);
     setRenderComplete(false);
     setProgress(0);
@@ -210,14 +202,22 @@ export default function VideoGeneratorPage() {
     }, 900);
 
     try {
-      const response = await fetch('/api/ai/generate', {
+      // 🟢 سینک کامل با بک‌اند جدید
+      const payloadInputData = {
+        prompt,
+        aspectRatio,
+        resolution,
+        imageUrl: videoMode === 'image' ? imageUrl : null 
+      };
+
+      const response = await fetch('/api/ai/generate/video', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           userId,
           pricingId: selectedModel.id,
           durationInSeconds: renderDuration,
-          inputData: { prompt, motionStrength, aspectRatio, imageUrl, first_frame_image: imageUrl }
+          inputData: payloadInputData
         })
       });
 
@@ -231,7 +231,7 @@ export default function VideoGeneratorPage() {
       setVideosUsed(prev => prev + 1);
 
       if (data.status === 'processing') {
-        const actualTaskId = data.outputUrl.replace('pending_task_', '');
+        const actualTaskId = data.taskId || data.outputUrl.replace('pending_task_', '');
         pollTaskStatus(actualTaskId);
       } else {
         setProgress(100);
@@ -322,14 +322,14 @@ export default function VideoGeneratorPage() {
                 </label>
                 <select 
                   disabled={isQuotaExceeded}
-                  className="w-full bg-[#03000A] border border-white/10 rounded-3xl p-4 md:p-5 text-sm text-neutral-200 focus:outline-none focus:border-fuchsia-500 focus:ring-1 focus:ring-fuchsia-500/50 transition-all appearance-none cursor-pointer font-bold shadow-inner disabled:opacity-50"
+                  className="w-full bg-[#03000A] border border-white/10 rounded-3xl p-4 md:p-5 text-sm text-white focus:outline-none focus:border-fuchsia-500 focus:ring-1 focus:ring-fuchsia-500/50 transition-all appearance-none cursor-pointer font-bold shadow-inner disabled:opacity-50"
                   value={selectedModel?.id || ''}
                   onChange={(e) => setSelectedModel(videoModels.find(m => String(m.id) === String(e.target.value)))}
                 >
                   {videoModels.length === 0 && <option>Loading core configs...</option>}
                   {videoModels.map((model) => (
-                    <option key={model.id} value={model.id}>
-                      {model.model_name} • {model.resolution} (High Quality)
+                    <option key={model.id} value={model.id} className="bg-[#03000A] text-white">
+                      {model.model_name}
                     </option>
                   ))}
                 </select>
@@ -368,33 +368,67 @@ export default function VideoGeneratorPage() {
                 />
               </div>
 
+              {/* پنل تنظیمات پیشرفته و جدید */}
               <div className="border-t border-white/10 pt-7 space-y-6">
                 <div className="flex items-center justify-between text-xs font-black uppercase tracking-wider">
-                  <div className="flex items-center gap-2 text-neutral-300 ml-2"><Sliders className="w-4 h-4 text-fuchsia-400" /> Parameters</div>
+                  <div className="flex items-center gap-2 text-neutral-300 ml-2"><Sliders className="w-4 h-4 text-fuchsia-400" /> Advanced Parameters</div>
                   <span className="text-white bg-white/10 border border-white/10 px-4 py-2 rounded-full font-bold">Cost: 1 Video</span>
                 </div>
 
-                <div className="bg-[#03000A] border border-white/10 p-5 rounded-3xl space-y-5 shadow-inner">
-                  <div className="space-y-3">
-                    <div className="flex justify-between text-xs font-bold text-neutral-400">
-                      <span>Motion Dynamics</span>
-                      <span className="font-mono text-fuchsia-400">{motionStrength}%</span>
+                <div className="bg-[#03000A] border border-white/10 p-5 rounded-3xl space-y-6 shadow-inner">
+                  
+                  {/* Aspect Ratio & Resolution Grid */}
+                  <div className="grid grid-cols-2 gap-4">
+                    <div className="space-y-2">
+                      <label className="text-[10px] font-bold text-neutral-400 uppercase tracking-widest ml-1">Aspect Ratio</label>
+                      <select 
+                        disabled={isQuotaExceeded}
+                        value={aspectRatio}
+                        onChange={(e) => setAspectRatio(e.target.value)}
+                        className="w-full bg-white/5 border border-white/10 rounded-full py-3 px-4 text-xs font-bold text-white focus:outline-none focus:border-fuchsia-500 appearance-none cursor-pointer disabled:opacity-50"
+                      >
+                        {ASPECT_RATIOS.map((ratio) => (
+                          <option key={ratio} value={ratio} className="bg-[#03000A] text-white">{ratio}</option>
+                        ))}
+                      </select>
                     </div>
-                    <input type="range" disabled={isQuotaExceeded} min="1" max="100" value={motionStrength} onChange={(e) => setMotionStrength(parseInt(e.target.value))} className="w-full h-2 bg-white/10 rounded-full appearance-none cursor-pointer accent-fuchsia-500 disabled:opacity-50" />
+
+                    <div className="space-y-2">
+                      <label className="text-[10px] font-bold text-neutral-400 uppercase tracking-widest ml-1 flex items-center gap-1">
+                        <Monitor className="w-3 h-3" /> Quality
+                      </label>
+                      <div className="grid grid-cols-2 bg-white/5 rounded-full p-1 border border-white/10">
+                        {['480p', '720p'].map((res) => (
+                          <button 
+                            type="button" disabled={isQuotaExceeded} key={res} 
+                            onClick={() => setResolution(res as '480p' | '720p')} 
+                            className={`py-2 text-xs font-black rounded-full transition-colors ${resolution === res ? 'bg-white/15 text-white shadow-md' : 'text-neutral-500 hover:text-white'} disabled:opacity-50`}
+                          >
+                            {res.toUpperCase()}
+                          </button>
+                        ))}
+                      </div>
+                    </div>
                   </div>
 
-                  <div className="grid grid-cols-2 gap-4 pt-2">
-                    <div className="grid grid-cols-2 bg-white/5 rounded-full p-1">
-                      {['16:9', '9:16'].map((ratio) => (
-                        <button type="button" disabled={isQuotaExceeded} key={ratio} onClick={() => setAspectRatio(ratio)} className={`py-2.5 text-xs font-black rounded-full transition-colors ${aspectRatio === ratio ? 'bg-white/10 text-white shadow-md' : 'text-neutral-500 hover:text-white'} disabled:opacity-50`}>{ratio}</button>
-                      ))}
+                  {/* Duration Slider (1 to 15s) */}
+                  <div className="space-y-3 pt-2">
+                    <div className="flex justify-between text-xs font-bold text-neutral-400">
+                      <span>Video Duration</span>
+                      <span className="font-mono text-fuchsia-400">{renderDuration} Seconds</span>
                     </div>
-                    <div className="grid grid-cols-2 bg-white/5 rounded-full p-1">
-                      {[5, 10].map((sec) => (
-                        <button type="button" disabled={isQuotaExceeded} key={sec} onClick={() => setRenderDuration(sec)} className={`py-2.5 text-xs font-black rounded-full transition-colors ${renderDuration === sec ? 'bg-white/10 text-white shadow-md' : 'text-neutral-500 hover:text-white'} disabled:opacity-50`}>{sec}s</button>
-                      ))}
+                    <input 
+                      type="range" disabled={isQuotaExceeded} min="1" max="15" 
+                      value={renderDuration} 
+                      onChange={(e) => setRenderDuration(parseInt(e.target.value))} 
+                      className="w-full h-2 bg-white/10 rounded-full appearance-none cursor-pointer accent-fuchsia-500 disabled:opacity-50" 
+                    />
+                    <div className="flex justify-between text-[10px] font-mono text-neutral-600 px-1">
+                      <span>1s</span>
+                      <span>15s</span>
                     </div>
                   </div>
+                  
                 </div>
               </div>
 
@@ -452,9 +486,8 @@ export default function VideoGeneratorPage() {
                     <CheckCircle2 className="w-12 h-12 text-emerald-400 mb-3 drop-shadow-[0_0_30px_rgba(52,211,153,0.4)] shrink-0 mt-4" />
                     <h3 className="text-2xl font-black text-white mb-6 tracking-tight shrink-0">Render Complete</h3>
                     
-                    {/* 🟢 پیش‌نمایش دقیق (Flawless Preview Box) بر اساس ابعاد انتخابی */}
                     <div className={`relative bg-black border border-white/10 rounded-2xl overflow-hidden shadow-2xl flex items-center justify-center shrink-0 ${
-                      aspectRatio === '9:16' ? 'aspect-[9/16] max-h-[45vh] w-auto mx-auto' : 'aspect-video w-full'
+                      aspectRatio.includes('16') && aspectRatio.startsWith('9') ? 'aspect-[9/16] max-h-[45vh] w-auto mx-auto' : 'aspect-video w-full'
                     }`}>
                       {outputVideoUrl ? (
                         <video src={outputVideoUrl} controls autoPlay loop className="w-full h-full object-contain" />
@@ -463,13 +496,11 @@ export default function VideoGeneratorPage() {
                       )}
                     </div>
 
-                    {/* 🟢 اکشن بارهای حرفه‌ای (پشتیبانی از دکمه ریجنریت) */}
                     <div className="flex flex-wrap items-center justify-center gap-3 w-full mt-8 pb-4 shrink-0">
                       <button onClick={() => setRenderComplete(false)} className="flex-1 min-w-[100px] py-3.5 rounded-full border border-white/10 text-xs font-black uppercase text-neutral-400 transition-colors hover:bg-white/5 hover:text-white">
                         Dismiss
                       </button>
 
-                      {/* دکمه ریجنریت یک‌بار مصرف */}
                       {canRegenerate && (
                         <button 
                           onClick={() => executeGeneration(true)} 
