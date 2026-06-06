@@ -59,7 +59,7 @@ const TEAM_MEMBERS = [
   {
     id: "sahel",
     name: "Sahel Salem",
-    role: "VP of EU Relations & Ecosystem",
+    role: "CO Founder & Leader Ecosystem Partnerships",
     image: "/sahel.jpeg",
     delay: 0.3,
     colors: {

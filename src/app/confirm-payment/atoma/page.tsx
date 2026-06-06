@@ -2,18 +2,19 @@
 
 import React, { Suspense, useState, useEffect, useRef } from 'react';
 import { useSearchParams, useRouter } from 'next/navigation';
-import Image from 'next/image';
-import { motion, AnimatePresence } from 'framer-motion';
+import { motion } from 'framer-motion';
 import { 
-  CheckCircle2, ArrowLeft, RefreshCw, Send, 
-  ShieldCheck, ScanLine, Clock, HeartHandshake, Zap, Upload, Receipt, Loader2, SmartphoneNfc
+  CheckCircle2, RefreshCw, Send, 
+  ScanLine, Upload, Receipt, Loader2, SmartphoneNfc
 } from 'lucide-react';
-import { createClient } from '@supabase/supabase-js';
 
-// Initialize Supabase Client
+// 🟢 تغییر بسیار مهم: استفاده از Browser Client برای خواندن صحیح کوکی‌های لاگین
+import { createBrowserClient } from '@supabase/ssr';
+
+// Initialize Supabase Browser Client
 const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL || '';
 const supabaseKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY || '';
-const supabase = createClient(supabaseUrl, supabaseKey);
+const supabase = createBrowserClient(supabaseUrl, supabaseKey);
 
 function AtomaConfirmContent() {
   const searchParams = useSearchParams();
@@ -78,8 +79,9 @@ function AtomaConfirmContent() {
 
     setIsSubmitting(true);
     try {
-      const { data: { user } } = await supabase.auth.getUser();
-      if (!user) throw new Error("کاربر لاگین نیست.");
+      // 🟢 اکنون این بخش کاربر را به درستی پیدا می‌کند
+      const { data: { user }, error: authError } = await supabase.auth.getUser();
+      if (authError || !user) throw new Error("کاربر لاگین نیست. لطفاً مجدداً وارد سایت شوید.");
 
       // ۱. آپلود عکس رسید در دیتابیس
       const fileExt = receiptImage.name.split('.').pop();
@@ -117,7 +119,7 @@ function AtomaConfirmContent() {
           router.push('/dashboard/profile');
         }, 4000);
       } else {
-        throw new Error("خطا در ارتباط با وب‌هوک.");
+        throw new Error("خطا در ارتباط با سرور رخ داد.");
       }
     } catch (error: any) {
       console.error("Error submitting payment confirmation:", error);
@@ -185,7 +187,6 @@ function AtomaConfirmContent() {
             <div className="relative aspect-square w-full bg-white rounded-2xl overflow-hidden border-4 border-[#FAD961]/20 p-2 shadow-[0_0_30px_rgba(250,217,97,0.1)]">
               <div className="absolute top-0 left-0 w-full h-1 bg-[#FAD961] shadow-[0_0_15px_3px_rgba(250,217,97,0.6)] z-20 animate-[bounce_3s_infinite]" />
               <div className="relative w-full h-full bg-gray-200 rounded-lg flex items-center justify-center">
-                {/* جایگذاری تصویر واقعی QR Code شما */}
                 <span className="text-gray-400 text-xs font-bold">QR CODE HERE</span>
               </div>
             </div>
@@ -289,7 +290,7 @@ export default function AtomaPayPage() {
         <div className="absolute inset-0" style={{ backgroundImage: 'radial-gradient(circle, #ffffff 1px, transparent 1px)', backgroundSize: '100px 100px', opacity: 0.05 }} />
       </div>
 
-      <div className="relative z-10 w-full max-w-6xl">
+      <div className="relative z-10 w-full max-w-6xl mt-20">
         <Suspense fallback={
           <div className="flex flex-col items-center justify-center min-h-[50vh]">
             <div className="p-6 bg-black rounded-3xl shadow-2xl mb-5 relative border border-[#FAD961]/20">
