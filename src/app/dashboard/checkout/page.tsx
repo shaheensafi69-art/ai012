@@ -1,313 +1,296 @@
 "use client";
 
-import React, { useState, Suspense } from 'react';
+import React, { Suspense, useState, useEffect } from 'react';
+import { useSearchParams, useRouter } from 'next/navigation';
 import { motion, AnimatePresence } from 'framer-motion';
 import { 
-  ArrowLeft, CreditCard, ShieldCheck, 
-  CheckCircle2, Loader2, Lock, Bitcoin, Banknote, QrCode, SmartphoneNfc
+  ArrowLeft, CreditCard, SmartphoneNfc, Building, 
+  Wallet, Bitcoin, Loader2, Lock, ShieldCheck, CheckCircle2 
 } from 'lucide-react';
-import Link from 'next/link';
-import { useSearchParams, useRouter } from 'next/navigation';
+import { createBrowserClient } from '@supabase/ssr';
 
-// تنظیم دقیق سهمیه‌های جدید برای کریتور و پرو
-const PLAN_DETAILS = {
-  basic: { name: 'Basic', price: 10, images: 50, videos: 0, desc: 'Essential tools for text and images.' },
-  creator: { name: 'Creator', price: 19, images: 200, videos: 10, desc: 'Professional suite for content creators.' },
-  pro: { name: 'Pro', price: 35, images: 600, videos: 30, desc: 'Maximum capacity for studios.' },
-};
+const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL || '';
+const supabaseKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY || '';
+const supabase = createBrowserClient(supabaseUrl, supabaseKey);
 
 function CheckoutContent() {
   const searchParams = useSearchParams();
   const router = useRouter();
-  
-  const planQuery = (searchParams.get('plan') as keyof typeof PLAN_DETAILS) || 'creator';
-  const selectedPlan = PLAN_DETAILS[planQuery] || PLAN_DETAILS['creator'];
+  const planId = searchParams.get('plan') || 'creator';
 
-  // دسته‌بندی پرداخت‌ها: 'auto' (اتوماتیک) و 'manual' (دستی)
-  const [paymentCategory, setPaymentCategory] = useState<'auto' | 'manual'>('auto');
-  const [paymentMethod, setPaymentMethod] = useState<'stripe' | 'paypal' | 'crypto' | 'hesabpay' | 'atomapay' | 'cashinoffice'>('stripe');
-  
+  const [planData, setPlanData] = useState<any>(null);
+  const [isLoading, setIsLoading] = useState(true);
+  const [selectedMethod, setSelectedMethod] = useState<string>('credit');
   const [isProcessing, setIsProcessing] = useState(false);
-  const [errorMessage, setErrorMessage] = useState('');
 
-  // هندل کردن مسیرهای پرداخت بر اساس لیست شما
-  const handlePayment = async (e: React.FormEvent) => {
-    e.preventDefault();
+  useEffect(() => {
+    const fetchPlanDetails = async () => {
+      try {
+        const { data } = await supabase
+          .from('plans')
+          .select('*')
+          .ilike('id', planId)
+          .single();
+        
+        if (data) setPlanData(data);
+      } catch (error) {
+        console.error("Error fetching plan:", error);
+      } finally {
+        setIsLoading(false);
+      }
+    };
+    fetchPlanDetails();
+  }, [planId]);
+
+  // 🟢 تنظیم دقیق مسیرها (route) بر اساس پوشه‌های شما در confirm-payment
+  const paymentMethods = [
+    { 
+      id: 'credit', 
+      title: 'Credit & Debit Card', 
+      desc: 'Powered by Stripe', 
+      icon: <CreditCard className="w-5 h-5" />, 
+      isSoon: false, 
+      route: 'stripe' // مسیر استرایپ
+    },
+    { 
+      id: 'atomapay', 
+      title: 'AtomaPay', 
+      desc: 'Secure Manual Transfer', 
+      icon: <Wallet className="w-5 h-5" />, 
+      isSoon: false, 
+      route: 'atoma' // 👈 مطابق با اسم پوشه شما
+    },
+    { 
+      id: 'hesabpay', 
+      title: 'HesabPay', 
+      desc: 'Afghan Local Gateway', 
+      icon: <SmartphoneNfc className="w-5 h-5" />, 
+      isSoon: false, 
+      route: 'hesabpay' // 👈 مطابق با اسم پوشه شما
+    },
+    { 
+      id: 'cash', 
+      title: 'Cash In Office', 
+      desc: 'In-person payment', 
+      icon: <Building className="w-5 h-5" />, 
+      isSoon: false, 
+      route: 'cash' // 👈 مطابق با اسم پوشه شما
+    },
+    { 
+      id: 'crypto', 
+      title: 'Cryptocurrency', 
+      desc: 'BTC, ETH, USDT', 
+      icon: <Bitcoin className="w-5 h-5" />, 
+      isSoon: true, 
+      route: '#' 
+    },
+    { 
+      id: 'paypal', 
+      title: 'PayPal', 
+      desc: 'Global Payments', 
+      icon: <div className="font-bold text-lg font-serif italic tracking-tighter">P</div>, 
+      isSoon: true, 
+      route: '#' 
+    },
+  ];
+
+  const handleProceed = () => {
+    if (!planData) return;
     setIsProcessing(true);
-    setErrorMessage('');
-
-    try {
-      // 1. هندل کردن پرداخت‌های دستی (ارجاع به صفحات تایید)
-      if (paymentCategory === 'manual') {
-        let redirectPath = '';
-        if (paymentMethod === 'atomapay') redirectPath = '/confirm-payment/atoma';
-        if (paymentMethod === 'cashinoffice') redirectPath = '/confirm-payment/cash';
-        if (paymentMethod === 'hesabpay') redirectPath = '/confirm-payment/hesabpay';
-
-        // ارسال اطلاعات پلن به صفحه تایید دستی
-        router.push(`${redirectPath}?plan=${planQuery}&amount=${selectedPlan.price}`);
-        return;
-      }
-
-      // 2. هندل کردن پرداخت‌های اتوماتیک (ارتباط با APIها)
-      let apiEndpoint = '';
-      if (paymentMethod === 'stripe') apiEndpoint = '/api/checkout/stripe';
-
-      const response = await fetch(apiEndpoint, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ 
-          planId: planQuery, 
-          amount: selectedPlan.price 
-        })
-      });
-
-      const data = await response.json();
-
-      if (!response.ok) throw new Error(data.error || 'Failed to initiate checkout');
-
-      // انتقال کاربر به درگاه پرداخت استرایپ
-      if (data.url) {
-        window.location.href = data.url;
-      } else {
-        throw new Error('Checkout URL not found.');
-      }
-
-    } catch (error: any) {
-      console.error("Payment Error:", error);
-      setErrorMessage(error.message || 'Something went wrong. Please try again.');
+    
+    const method = paymentMethods.find(m => m.id === selectedMethod);
+    if (!method || method.isSoon) {
       setIsProcessing(false);
+      return;
     }
+
+    const orderId = `ORD-${Math.floor(Math.random() * 1000000)}`;
+    
+    // 🟢 هدایت دقیق به پوشه confirm-payment
+    setTimeout(() => {
+      router.push(`/confirm-payment/${method.route}?plan=${planData.name}&amount=${planData.price}&order_id=${orderId}`);
+    }, 600);
   };
 
-  // آپدیت کردن متد پیش‌فرض وقتی تب تغییر می‌کند
-  const handleCategoryChange = (category: 'auto' | 'manual') => {
-    setPaymentCategory(category);
-    if (category === 'auto') setPaymentMethod('stripe');
-    if (category === 'manual') setPaymentMethod('hesabpay');
-  };
+  if (isLoading) {
+    return (
+      <div className="flex justify-center items-center py-32">
+        <Loader2 className="w-8 h-8 text-[#FAD961] animate-spin" />
+      </div>
+    );
+  }
+
+  if (!planData) {
+    return (
+      <div className="text-center py-32">
+        <p className="text-neutral-400">Plan not found or unavailable.</p>
+        <button onClick={() => router.back()} className="mt-4 text-[#FAD961] font-medium hover:text-white transition-colors">Return to Billing</button>
+      </div>
+    );
+  }
 
   return (
-    <div className="grid grid-cols-1 lg:grid-cols-12 gap-8 lg:gap-12">
+    <div className="max-w-5xl mx-auto w-full relative z-10">
       
-      {/* ==========================================
-          LEFT COLUMN: ORDER SUMMARY
-      ========================================== */}
-      <div className="lg:col-span-5 space-y-6">
-        <div className="bg-[#070707]/80 backdrop-blur-xl border border-white/10 rounded-[2rem] p-8 shadow-2xl sticky top-8">
-          <h2 className="text-xs font-bold tracking-[0.2em] text-neutral-500 uppercase mb-6">Order Summary</h2>
-          
-          <div className="flex justify-between items-end mb-6 pb-6 border-b border-white/5">
-            <div>
-              <h3 className="text-3xl font-black text-white">{selectedPlan.name}</h3>
-              <p className="text-sm text-neutral-400 mt-1">SAFI Neural Studio</p>
-            </div>
-            <div className="text-right">
-              <span className="text-4xl font-black text-[#FAD961]">${selectedPlan.price}</span>
-              <span className="text-sm text-neutral-500 block">/month</span>
-            </div>
+      {/* هدر بازگشت */}
+      <div className="mb-8 flex items-center">
+        <button onClick={() => router.push('/dashboard/profile/billing')} className="group flex items-center gap-2 text-sm font-medium text-neutral-400 hover:text-neutral-200 transition-colors">
+          <div className="flex h-8 w-8 items-center justify-center rounded-lg border border-neutral-800 bg-[#0d0d0d] transition-all group-hover:border-neutral-700">
+            <ArrowLeft className="h-4 w-4" />
           </div>
+          Back to Plans
+        </button>
+      </div>
 
-          <div className="space-y-4 mb-8">
-            <div className="flex items-center gap-3">
-              <CheckCircle2 className="w-5 h-5 text-[#D4AF37]" />
-              <span className="text-neutral-300 font-medium">{selectedPlan.images} Neural Images</span>
-            </div>
-            <div className="flex items-center gap-3">
-              <CheckCircle2 className="w-5 h-5 text-[#D4AF37]" />
-              <span className="text-neutral-300 font-medium">{selectedPlan.videos} Cinematic Videos</span>
-            </div>
-            <div className="flex items-center gap-3">
-              <CheckCircle2 className="w-5 h-5 text-[#D4AF37]" />
-              <span className="text-neutral-300 font-medium">Unlimited Chat & Code Engine</span>
-            </div>
-          </div>
+      <div className="mb-8">
+        <h1 className="text-2xl sm:text-3xl font-bold text-neutral-100 tracking-tight">Checkout</h1>
+        <p className="text-sm text-neutral-500 mt-1">Review your plan and select a secure payment method.</p>
+      </div>
 
-          <div className="bg-[#0A0A0A] rounded-xl p-4 flex items-center gap-4 border border-white/5">
-            <ShieldCheck className="w-8 h-8 text-green-500 opacity-80" />
-            <div>
-              <p className="text-sm font-bold text-white">Guaranteed Security</p>
-              <p className="text-xs text-neutral-500">256-bit SSL Encryption</p>
-            </div>
+      <div className="grid grid-cols-1 lg:grid-cols-12 gap-8 items-start">
+        
+        {/* ==========================================
+            LEFT COLUMN: PAYMENT METHODS
+        ========================================== */}
+        <div className="lg:col-span-7 space-y-6">
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+            {paymentMethods.map((method, index) => {
+              const isSelected = selectedMethod === method.id;
+              
+              return (
+                <motion.div 
+                  initial={{ opacity: 0, y: 10 }}
+                  animate={{ opacity: 1, y: 0 }}
+                  transition={{ delay: index * 0.05 }}
+                  key={method.id}
+                  onClick={() => !method.isSoon && setSelectedMethod(method.id)}
+                  className={`relative p-5 rounded-2xl border flex flex-col transition-all duration-300 ${
+                    method.isSoon 
+                      ? 'bg-[#0a0a0a]/50 border-neutral-800/40 opacity-60 cursor-not-allowed grayscale-[0.5]'
+                      : isSelected
+                        ? 'bg-[#FAD961]/5 border-[#FAD961]/50 cursor-pointer shadow-[0_0_20px_rgba(250,217,97,0.05)] transform scale-[1.02]'
+                        : 'bg-[#0d0d0d] border-neutral-800/80 hover:border-neutral-600 hover:bg-[#111] cursor-pointer'
+                  }`}
+                >
+                  {/* لیبل Coming Soon */}
+                  {method.isSoon && (
+                    <div className="absolute top-4 right-4 flex items-center gap-1 text-neutral-500 bg-neutral-900 px-2 py-1 rounded-md border border-neutral-800">
+                      <Lock className="w-3 h-3" />
+                      <span className="text-[9px] font-bold uppercase tracking-widest">Soon</span>
+                    </div>
+                  )}
+
+                  {/* تیک انتخاب */}
+                  <AnimatePresence>
+                    {!method.isSoon && isSelected && (
+                      <motion.div 
+                        initial={{ scale: 0 }} animate={{ scale: 1 }} exit={{ scale: 0 }}
+                        className="absolute top-4 right-4"
+                      >
+                        <CheckCircle2 className="w-5 h-5 text-[#FAD961]" />
+                      </motion.div>
+                    )}
+                  </AnimatePresence>
+
+                  <div className={`w-12 h-12 rounded-xl flex items-center justify-center mb-4 transition-colors ${
+                    isSelected ? 'bg-[#FAD961]/10 text-[#FAD961]' : 'bg-neutral-900 text-neutral-400 border border-neutral-800'
+                  }`}>
+                    {method.icon}
+                  </div>
+
+                  <div>
+                    <h3 className={`text-sm font-bold mb-1 tracking-wide ${isSelected ? 'text-neutral-100' : 'text-neutral-300'}`}>
+                      {method.title}
+                    </h3>
+                    <p className="text-xs text-neutral-500 font-medium">{method.desc}</p>
+                  </div>
+                </motion.div>
+              );
+            })}
           </div>
         </div>
-      </div>
 
-      {/* ==========================================
-          RIGHT COLUMN: PAYMENT DETAILS
-      ========================================== */}
-      <div className="lg:col-span-7">
-        <form onSubmit={handlePayment} className="bg-[#070707]/80 backdrop-blur-xl border border-white/10 rounded-[2rem] p-8 shadow-2xl">
-          <h2 className="text-xl font-black text-white mb-6">Select Payment Method</h2>
-
-          {/* Category Tabs: Auto vs Manual */}
-          <div className="flex p-1 bg-[#0A0A0A] border border-white/5 rounded-xl mb-6">
-            <button
-              type="button"
-              onClick={() => handleCategoryChange('auto')}
-              className={`flex-1 py-2 text-sm font-bold rounded-lg transition-all ${
-                paymentCategory === 'auto' ? 'bg-white/10 text-white shadow-md' : 'text-neutral-500 hover:text-white'
-              }`}
-            >
-              Automatic (Instant)
-            </button>
-            <button
-              type="button"
-              onClick={() => handleCategoryChange('manual')}
-              className={`flex-1 py-2 text-sm font-bold rounded-lg transition-all ${
-                paymentCategory === 'manual' ? 'bg-white/10 text-white shadow-md' : 'text-neutral-500 hover:text-white'
-              }`}
-            >
-              Manual (Verify)
-            </button>
-          </div>
-
-          <AnimatePresence mode="wait">
-            {/* ---------------- AUTOMATIC METHODS ---------------- */}
-            {paymentCategory === 'auto' && (
-              <motion.div key="auto" initial={{ opacity: 0, x: -10 }} animate={{ opacity: 1, x: 0 }} exit={{ opacity: 0, x: 10 }}>
-                <div className="grid grid-cols-1 md:grid-cols-3 gap-3 mb-6">
-                  {/* درگاه فعال: استرایپ */}
-                  <button 
-                    type="button" onClick={() => setPaymentMethod('stripe')}
-                    className={`p-4 rounded-xl flex flex-col items-center gap-2 border transition-all ${
-                      paymentMethod === 'stripe' ? 'bg-[#D4AF37]/10 border-[#D4AF37] text-[#FAD961]' : 'bg-[#0A0A0A] border-white/5 text-neutral-400 hover:bg-white/5'
-                    }`}
-                  >
-                    <CreditCard className="w-6 h-6" />
-                    <span className="text-xs font-bold uppercase tracking-wider">Credit Card</span>
-                  </button>
-
-                  {/* درگاه غیرفعال: پی‌پال (Coming Soon) */}
-                  <button 
-                    type="button" 
-                    disabled
-                    className="p-4 rounded-xl flex flex-col items-center gap-2 border border-white/5 bg-[#070707] text-neutral-600 relative overflow-hidden cursor-not-allowed opacity-40"
-                  >
-                    <div className="absolute top-1.5 right-1.5 bg-[#D4AF37]/10 border border-[#D4AF37]/20 text-[#FAD961] text-[8px] font-black uppercase tracking-widest px-1.5 py-0.5 rounded-md scale-90">
-                      Soon
-                    </div>
-                    <div className="w-6 h-6 font-black text-xl flex items-center justify-center italic text-neutral-600">P</div>
-                    <span className="text-xs font-bold uppercase tracking-wider">PayPal</span>
-                  </button>
-
-                  {/* درگاه غیرفعال: کریپتو (Coming Soon) */}
-                  <button 
-                    type="button" 
-                    disabled
-                    className="p-4 rounded-xl flex flex-col items-center gap-2 border border-white/5 bg-[#070707] text-neutral-600 relative overflow-hidden cursor-not-allowed opacity-40"
-                  >
-                    <div className="absolute top-1.5 right-1.5 bg-[#D4AF37]/10 border border-[#D4AF37]/20 text-[#FAD961] text-[8px] font-black uppercase tracking-widest px-1.5 py-0.5 rounded-md scale-90">
-                      Soon
-                    </div>
-                    <Bitcoin className="w-6 h-6 text-neutral-600" />
-                    <span className="text-xs font-bold uppercase tracking-wider">Crypto</span>
-                  </button>
+        {/* ==========================================
+            RIGHT COLUMN: ORDER SUMMARY
+        ========================================== */}
+        <div className="lg:col-span-5">
+          <div className="rounded-2xl border border-neutral-800/60 bg-[#0d0d0d]/50 p-6 sm:p-8 sticky top-24">
+            
+            <h2 className="text-lg font-bold text-neutral-100 mb-6">Order Summary</h2>
+            
+            <div className="space-y-4 mb-6">
+              <div className="flex justify-between items-center pb-4 border-b border-neutral-800/60">
+                <div>
+                  <p className="text-base font-bold text-neutral-200 capitalize">{planData.name.split(' (')[0]}</p>
+                  <p className="text-xs text-[#D4AF37] font-medium mt-1 uppercase tracking-widest">Billed Monthly</p>
                 </div>
-                <div className="bg-[#050505] border border-white/5 rounded-xl p-4 text-center">
-                  <p className="text-sm text-neutral-400">You will be redirected securely to complete the payment. Your subscription will be activated instantly.</p>
-                </div>
-              </motion.div>
-            )}
+                <p className="text-lg font-bold text-neutral-200">${planData.price.toFixed(2)}</p>
+              </div>
 
-            {/* ---------------- MANUAL METHODS ---------------- */}
-            {paymentCategory === 'manual' && (
-              <motion.div key="manual" initial={{ opacity: 0, x: 10 }} animate={{ opacity: 1, x: 0 }} exit={{ opacity: 0, x: -10 }}>
-                <div className="grid grid-cols-1 md:grid-cols-3 gap-3 mb-6">
-                  <button 
-                    type="button" onClick={() => setPaymentMethod('hesabpay')}
-                    className={`p-4 rounded-xl flex flex-col items-center gap-2 border transition-all ${
-                      paymentMethod === 'hesabpay' ? 'bg-[#D4AF37]/10 border-[#D4AF37] text-[#FAD961]' : 'bg-[#0A0A0A] border-white/5 text-neutral-400 hover:bg-white/5'
-                    }`}
-                  >
-                    <QrCode className="w-6 h-6" />
-                    <span className="text-xs font-bold uppercase tracking-wider">HesabPay</span>
-                  </button>
-                  <button 
-                    type="button" onClick={() => setPaymentMethod('atomapay')}
-                    className={`p-4 rounded-xl flex flex-col items-center gap-2 border transition-all ${
-                      paymentMethod === 'atomapay' ? 'bg-[#D4AF37]/10 border-[#D4AF37] text-[#FAD961]' : 'bg-[#0A0A0A] border-white/5 text-neutral-400 hover:bg-white/5'
-                    }`}
-                  >
-                    <SmartphoneNfc className="w-6 h-6" />
-                    <span className="text-xs font-bold uppercase tracking-wider">AtomaPay</span>
-                  </button>
-                  <button 
-                    type="button" onClick={() => setPaymentMethod('cashinoffice')}
-                    className={`p-4 rounded-xl flex flex-col items-center gap-2 border transition-all ${
-                      paymentMethod === 'cashinoffice' ? 'bg-[#D4AF37]/10 border-[#D4AF37] text-[#FAD961]' : 'bg-[#0A0A0A] border-white/5 text-neutral-400 hover:bg-white/5'
-                    }`}
-                  >
-                    <Banknote className="w-6 h-6" />
-                    <span className="text-xs font-bold uppercase tracking-wider text-center leading-tight">Cash In Office</span>
-                  </button>
-                </div>
-                <div className="bg-[#050505] border border-white/5 rounded-xl p-4 text-center">
-                  <p className="text-sm text-neutral-400">You will receive instructions to send the payment. Verification may take up to 24 hours.</p>
-                </div>
-              </motion.div>
-            )}
-          </AnimatePresence>
+              <div className="flex justify-between items-center text-sm">
+                <p className="text-neutral-400">Subtotal</p>
+                <p className="text-neutral-300">${planData.price.toFixed(2)}</p>
+              </div>
+              <div className="flex justify-between items-center text-sm pb-4 border-b border-neutral-800/60">
+                <p className="text-neutral-400">Tax</p>
+                <p className="text-neutral-300">$0.00</p>
+              </div>
 
-          {/* Error Message */}
-          {errorMessage && (
-            <div className="mt-4 p-3 bg-red-500/10 border border-red-500/20 text-red-400 text-sm font-bold rounded-lg text-center">
-              {errorMessage}
+              <div className="flex justify-between items-center pt-2">
+                <p className="text-base font-bold text-neutral-100">Total Due</p>
+                <p className="text-2xl font-black text-[#FAD961]">${planData.price.toFixed(2)}</p>
+              </div>
             </div>
-          )}
 
-          {/* Action Button */}
-          <div className="mt-8 pt-8 border-t border-white/5">
+            <div className="flex items-start gap-3 text-xs text-neutral-400 mb-8 bg-[#0a0a0a] p-4 rounded-xl border border-neutral-800/60">
+              <ShieldCheck className="w-5 h-5 text-green-500/80 shrink-0" />
+              <span className="leading-relaxed">Guaranteed safe & secure checkout powered by SAFI AI 256-bit encryption standard.</span>
+            </div>
+
             <button 
-              type="submit" 
+              onClick={handleProceed}
               disabled={isProcessing}
-              className="w-full py-4 bg-gradient-to-r from-[#FAD961] to-[#D4AF37] text-black font-black uppercase tracking-wider rounded-xl shadow-[0_0_30px_rgba(212,175,55,0.2)] hover:scale-[1.02] transition-all flex items-center justify-center gap-2"
+              className="w-full py-3.5 bg-neutral-100 text-neutral-900 font-bold rounded-xl hover:bg-white transition-all flex items-center justify-center gap-2 disabled:opacity-70 shadow-lg"
             >
-              {isProcessing ? <Loader2 className="w-5 h-5 animate-spin" /> : <Lock className="w-5 h-5" />}
-              {isProcessing 
-                ? 'Processing...' 
-                : paymentCategory === 'auto' 
-                  ? `Pay $${selectedPlan.price} Securely` 
-                  : `Proceed to Verification`
-              }
+              {isProcessing ? (
+                <Loader2 className="w-5 h-5 animate-spin text-neutral-900" />
+              ) : (
+                <Lock className="w-4 h-4 text-neutral-900" />
+              )}
+              {isProcessing ? 'Initializing Gateway...' : 'Proceed to Payment'}
             </button>
-            <p className="text-center text-xs text-neutral-500 mt-4">By confirming, you agree to Safi International Capital LTD Terms of Service.</p>
+            <p className="text-center text-[10px] font-bold text-neutral-500 mt-5 uppercase tracking-widest">
+              Paying via {paymentMethods.find(m => m.id === selectedMethod)?.title}
+            </p>
+
           </div>
+        </div>
 
-        </form>
       </div>
-
     </div>
   );
 }
 
 export default function CheckoutPage() {
   return (
-    <main className="min-h-screen bg-[#020202] text-slate-100 font-sans selection:bg-[#FAD961] selection:text-black pb-20 pt-28 px-6 lg:px-16">
-      <div className="fixed inset-0 z-0 pointer-events-none overflow-hidden">
-        <div className="absolute top-0 right-0 w-[50%] h-[50%] bg-[#D4AF37]/5 rounded-full blur-[150px]" />
+    <main className="relative min-h-screen bg-[#080808] text-neutral-200 antialiased selection:bg-[#FAD961] selection:text-black pb-16 pt-24 px-4 sm:px-6 lg:px-8 overflow-hidden">
+      
+      {/* پس‌زمینه نوری */}
+      <div className="fixed inset-0 z-0 pointer-events-none">
+        <div className="absolute top-[10%] right-[-10%] w-[500px] h-[500px] bg-[#D4AF37]/5 rounded-full blur-[150px]" />
       </div>
 
-      <div className="relative z-10 max-w-[70rem] mx-auto">
-        <div className="flex items-center gap-4 mb-10">
-          <Link href="/dashboard/profile" className="p-3 bg-[#0A0A0A] border border-white/10 hover:border-[#FAD961]/50 hover:bg-white/5 rounded-2xl transition-all shadow-lg">
-            <ArrowLeft className="w-5 h-5 text-neutral-400 hover:text-white" />
-          </Link>
-          <div>
-            <h1 className="text-3xl font-black tracking-tight text-white flex items-center gap-3">
-              Checkout
-            </h1>
-          </div>
-        </div>
-
+      <div className="relative z-10 w-full">
         <Suspense fallback={
-          <div className="flex justify-center py-20">
-            <Loader2 className="w-10 h-10 text-[#D4AF37] animate-spin" />
+          <div className="flex flex-col items-center justify-center min-h-[50vh]">
+            <div className="p-5 bg-[#0d0d0d] rounded-2xl shadow-xl mb-4 border border-neutral-800">
+              <Loader2 className="animate-spin text-[#FAD961]" size={32} />
+            </div>
+            <p className="font-medium text-neutral-500 uppercase tracking-[0.2em] text-[10px]">Preparing Secure Checkout...</p>
           </div>
         }>
           <CheckoutContent />
         </Suspense>
-
       </div>
     </main>
   );

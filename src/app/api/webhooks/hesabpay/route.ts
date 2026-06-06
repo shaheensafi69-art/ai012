@@ -1,7 +1,7 @@
 import { NextResponse } from 'next/server';
 import { createClient } from '@supabase/supabase-js';
 
-// اتصال به سوپابیس در سمت سرور
+// اتصال به سوپابیس با کلید سرویس (برای دور زدن RLS)
 const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL || '';
 const supabaseServiceKey = process.env.SUPABASE_SERVICE_ROLE_KEY || ''; 
 const supabase = createClient(supabaseUrl, supabaseServiceKey);
@@ -9,83 +9,78 @@ const supabase = createClient(supabaseUrl, supabaseServiceKey);
 export async function POST(request: Request) {
   try {
     const body = await request.json();
-    // استخراج شماره تراکنش و لینک عکس که از فرانت‌اند فرستادیم
-    const { orderId, amountUsd, amountAfn, customerEmail, planName, transactionId, receiptUrl } = body;
+    
+    // دریافت userId که در کدهای جدید فرانت‌اند اضافه کردیم
+    const { 
+      orderId, amountUsd, amountAfn, customerEmail, 
+      planName, transactionId, receiptUrl, userId 
+    } = body;
 
-    // ۱. پیدا کردن اردر ثبت شده در مرحله قبل
-    const { data: orderData, error: orderError } = await supabase
-      .from('orders')
-      .select('customer_email, plan_name')
-      .eq('order_id', orderId)
-      .single();
-
-    const realEmail = orderData?.customer_email || customerEmail;
-    const finalPlanName = orderData?.plan_name || planName;
-
-    if (!realEmail || realEmail === 'Unknown Email') {
-      console.error('امکان پیگیری سفارش بدون ایمیل معتبر وجود ندارد.');
+    // ۱. دریافت مستقیم اطلاعات کاربر از جدول profiles با استفاده از userId
+    let profileData = null;
+    if (userId) {
+      const { data, error } = await supabase
+        .from('profiles')
+        .select('*')
+        .eq('id', userId)
+        .single();
+      
+      if (data) profileData = data;
+      if (error) console.error('Profile fetch error:', error);
     }
 
-    // ۲. خواندن مشخصات کامل کاربر از جدول profiles
-    const { data: profileData, error: profileError } = await supabase
-      .from('profiles')
-      .select('*')
-      .eq('email', realEmail)
-      .single();
-
-    if (profileError) {
-      console.error('Profile query error:', profileError);
-    }
-
+    // استخراج مشخصات کاربر با مقادیر پیش‌فرض
     const firstName = profileData?.first_name || 'نامشخص';
     const lastName = profileData?.last_name || 'نامشخص';
+    const realEmail = profileData?.email || customerEmail || 'نامشخص';
     const phoneNumber = profileData?.phone_number || 'نامشخص';
     const currentBalance = profileData?.credit_balance || 0;
-    const dob = profileData?.date_of_birth || 'نامشخص';
     const country = profileData?.country || 'نامشخص';
     const avatarUrl = profileData?.avatar_url || '';
 
-    // ۳. به‌روزرسانی وضعیت سفارش و ذخیره لینک عکس و کد پیگیری
+    // ۲. ثبت یا به‌روزرسانی سفارش (upsert)
+    // استفاده از upsert ضروری است چون سفارش ممکن است برای اولین بار ثبت شود
     const { error: dbError } = await supabase
       .from('orders')
-      .update({ 
+      .upsert({ 
+        order_id: orderId,
+        user_id: userId,
+        customer_email: realEmail,
         status: 'awaiting_verification',
-        amount_afn: parseFloat(String(amountAfn).replace(/,/g, '')),
+        amount_usd: parseFloat(amountUsd) || 0,
+        amount_afn: parseFloat(String(amountAfn).replace(/,/g, '')) || 0,
         first_name: firstName,
         last_name: lastName,
         customer_phone: phoneNumber,
         credit_balance_before: currentBalance,
-        date_of_birth: dob,
         country: country,
         avatar_url: avatarUrl,
-        plan_name: finalPlanName,
-        transaction_id: transactionId, // ذخیره کد پیگیری
-        receipt_url: receiptUrl // ذخیره لینک عکس رسید
-      })
-      .eq('order_id', orderId);
+        plan_name: planName,
+        transaction_id: transactionId,
+        receipt_url: receiptUrl 
+      }, { onConflict: 'order_id' });
 
     if (dbError) {
-      console.error('Supabase Update Error:', dbError);
-      return NextResponse.json({ error: 'خطا در به‌روزرسانی نهایی دیتابیس' }, { status: 500 });
+      console.error('Database Error:', dbError);
+      return NextResponse.json({ error: 'خطا در ثبت دیتابیس' }, { status: 500 });
     }
 
-    // ۴. ارسال پیام به ربات تلگرام
+    // ۳. ارسال پیام به ربات تلگرام
     const BOT_TOKEN = process.env.TELEGRAM_BOT_TOKEN;
     const CHAT_ID = process.env.TELEGRAM_CHAT_ID;
 
     if (!BOT_TOKEN || !CHAT_ID) {
-      return NextResponse.json({ success: true, message: 'تنظیمات تلگرام ناقص است.' });
+      return NextResponse.json({ success: true, message: 'Telegram settings missing' });
     }
 
-    // استفاده از HTML به جای Markdown برای جلوگیری از ارورهای نگارشی تلگرام
     const telegramMessage = `
-🌟 <b>تراکنش جدید در انتظار تایید</b> 🌟
+🌟 <b>تراکنش جدید (حساب‌پی) در انتظار تایید</b> 🌟
 ────────────────
 📦 <b>مشخصات پکیج:</b>
-• نام پکیج: <b>${finalPlanName}</b>
+• نام پکیج: <b>${planName}</b>
 • کد سفارش: <code>${orderId}</code>
 • کد تراکنش (TID): <code>${transactionId || 'نامشخص'}</code>
-• روش پرداخت: HesabPay (دستی)
+• روش پرداخت: <b>HesabPay</b>
 
 👤 <b>مشخصات کامل کاربر:</b>
 • نام: ${firstName} ${lastName}
@@ -94,14 +89,14 @@ export async function POST(request: Request) {
 • کشور: ${country}
 • موجودی فعلی: ${currentBalance.toLocaleString()}
 
-💰 <b>جزئیات مالی تراکنش:</b>
+💰 <b>جزئیات مالی:</b>
 • مبلغ دلاری: $${parseFloat(amountUsd).toFixed(2)}
 • مبلغ به افغانی: ${amountAfn} AFN
 ────────────────
 ⚠️ <b>اقدام لازم:</b> لطفاً عکس رسید پیوست شده را بررسی کنید. در صورت دریافت وجه، سفارش را تایید نمایید.
     `;
 
-    // اگر لینک عکس رسید وجود داشت، عکس را با کپشن بفرست
+    // ارسال عکس و متن به تلگرام
     if (receiptUrl) {
       await fetch(`https://api.telegram.org/bot${BOT_TOKEN}/sendPhoto`, {
         method: 'POST',
@@ -114,22 +109,21 @@ export async function POST(request: Request) {
         }),
       });
     } else {
-      // در غیر این صورت فقط متن را بفرست
       await fetch(`https://api.telegram.org/bot${BOT_TOKEN}/sendMessage`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           chat_id: CHAT_ID,
-          text: telegramMessage + `\n\n❌ <i>اخطار: کاربر عکسی آپلود نکرده است.</i>`,
+          text: telegramMessage + `\n\n❌ <i>اخطار: عکس رسید دریافت نشد.</i>`,
           parse_mode: 'HTML',
         }),
       });
     }
 
-    return NextResponse.json({ success: true, message: 'وب‌هوک حساب‌پی با موفقیت اجرا شد.' });
+    return NextResponse.json({ success: true });
 
   } catch (error) {
-    console.error('Webhook Error:', error);
-    return NextResponse.json({ error: 'خطای داخلی سرور' }, { status: 500 });
+    console.error('Critical Webhook Error:', error);
+    return NextResponse.json({ error: 'Internal Server Error' }, { status: 500 });
   }
 }

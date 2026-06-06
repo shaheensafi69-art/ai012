@@ -9,32 +9,25 @@ const supabase = createClient(supabaseUrl, supabaseServiceKey);
 export async function POST(request: Request) {
   try {
     const body = await request.json();
-    // اضافه شدن شماره تراکنش و لینک عکس رسید
-    const { orderId, amountUsd, amountAfn, customerEmail, planName, transactionId, receiptUrl } = body;
+    const { orderId, amountUsd, amountAfn, customerEmail, planName, transactionId, receiptUrl, userId } = body;
 
-    // ۱. پیدا کردن اردر ثبت شده در مرحله قبل
-    const { data: orderData, error: orderError } = await supabase
-      .from('orders')
-      .select('customer_email, plan_name')
-      .eq('order_id', orderId)
-      .single();
+    // ۱. خواندن مشخصات کامل کاربر از جدول profiles
+    let profileData = null;
+    let realEmail = customerEmail;
 
-    const realEmail = orderData?.customer_email || customerEmail;
-    const finalPlanName = orderData?.plan_name || planName;
+    if (userId) {
+      const { data, error } = await supabase
+        .from('profiles')
+        .select('*')
+        .eq('id', userId)
+        .single();
 
-    if (!realEmail || realEmail === 'Unknown Email') {
-      console.error('امکان پیگیری سفارش بدون ایمیل معتبر وجود ندارد.');
-    }
-
-    // ۲. خواندن مشخصات کامل کاربر از جدول profiles
-    const { data: profileData, error: profileError } = await supabase
-      .from('profiles')
-      .select('*')
-      .eq('email', realEmail)
-      .single();
-
-    if (profileError) {
-      console.error('Profile query error:', profileError);
+      if (data) {
+        profileData = data;
+        realEmail = data.email || customerEmail;
+      } else if (error) {
+        console.error('Profile query error:', error);
+      }
     }
 
     const firstName = profileData?.first_name || 'نامشخص';
@@ -45,12 +38,16 @@ export async function POST(request: Request) {
     const country = profileData?.country || 'نامشخص';
     const avatarUrl = profileData?.avatar_url || '';
 
-    // ۳. به‌روزرسانی وضعیت سفارش و ذخیره لینک عکس و کد پیگیری
+    // ۲. ثبت سفارش در دیتابیس
     const { error: dbError } = await supabase
       .from('orders')
-      .update({ 
+      .upsert({ 
+        order_id: orderId,
+        user_id: userId, // 🟢 این خط اضافه شد! بسیار مهم برای دیتابیس
+        customer_email: realEmail,
         status: 'awaiting_verification',
-        amount_afn: parseFloat(String(amountAfn).replace(/,/g, '')),
+        amount_usd: parseFloat(amountUsd) || 0, // 🟢 ایمن‌سازی اعداد
+        amount_afn: parseFloat(String(amountAfn).replace(/,/g, '')) || 0,
         first_name: firstName,
         last_name: lastName,
         customer_phone: phoneNumber,
@@ -58,34 +55,33 @@ export async function POST(request: Request) {
         date_of_birth: dob,
         country: country,
         avatar_url: avatarUrl,
-        plan_name: finalPlanName,
-        transaction_id: transactionId, // ذخیره کد پیگیری
-        receipt_url: receiptUrl // ذخیره لینک عکس رسید
-      })
-      .eq('order_id', orderId);
+        plan_name: planName,
+        transaction_id: transactionId,
+        receipt_url: receiptUrl 
+      }, { onConflict: 'order_id' });
 
     if (dbError) {
-      console.error('Supabase Update Error:', dbError);
-      return NextResponse.json({ error: 'خطا در به‌روزرسانی نهایی دیتابیس' }, { status: 500 });
+      // 🟢 این لاگ به شما در Vercel نشان می‌دهد دقیقاً چرا دیتابیس ارور داده
+      console.error('❌ Supabase Upsert Error:', dbError);
+      return NextResponse.json({ error: `خطای دیتابیس: ${dbError.message}` }, { status: 500 });
     }
 
-    // ۴. ارسال پیام به ربات تلگرام همراه با عکس
+    // ۳. ارسال پیام به ربات تلگرام
     const BOT_TOKEN = process.env.TELEGRAM_BOT_TOKEN;
     const CHAT_ID = process.env.TELEGRAM_CHAT_ID;
 
     if (!BOT_TOKEN || !CHAT_ID) {
-      return NextResponse.json({ success: true, message: 'تنظیمات تلگرام ناقص است.' });
+      return NextResponse.json({ success: true, message: 'ذخیره شد اما تلگرام تنظیم نیست.' });
     }
 
-    // استفاده از HTML برای جلوگیری از خطاهای Parse تلگرام
     const telegramMessage = `
 🌟 <b>تراکنش جدید در انتظار تایید</b> 🌟
 ────────────────
 📦 <b>مشخصات پکیج:</b>
-• نام پکیج: <b>${finalPlanName}</b>
+• نام پکیج: <b>${planName}</b>
 • کد سفارش: <code>${orderId}</code>
 • کد تراکنش (TID): <code>${transactionId || 'نامشخص'}</code>
-• روش پرداخت: Atoma Pay (دستی)
+• روش پرداخت: Manual Gateway
 
 👤 <b>مشخصات کامل کاربر:</b>
 • نام: ${firstName} ${lastName}
@@ -101,7 +97,6 @@ export async function POST(request: Request) {
 ⚠️ <b>اقدام لازم:</b> لطفاً عکس رسید پیوست شده را بررسی کنید. در صورت صحت، سفارش را تایید نمایید.
     `;
 
-    // اگر لینک عکس وجود داشت، عکس را بفرست و متن را کپشن کن
     if (receiptUrl) {
       await fetch(`https://api.telegram.org/bot${BOT_TOKEN}/sendPhoto`, {
         method: 'POST',
@@ -114,7 +109,6 @@ export async function POST(request: Request) {
         }),
       });
     } else {
-      // اگر به هر دلیلی عکسی آپلود نشده بود، فقط متن را بفرست
       await fetch(`https://api.telegram.org/bot${BOT_TOKEN}/sendMessage`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
@@ -128,8 +122,8 @@ export async function POST(request: Request) {
 
     return NextResponse.json({ success: true, message: 'وب‌هوک با موفقیت اجرا شد.' });
 
-  } catch (error) {
-    console.error('Webhook Error:', error);
-    return NextResponse.json({ error: 'خطای داخلی سرور' }, { status: 500 });
+  } catch (error: any) {
+    console.error('❌ Webhook Critical Error:', error);
+    return NextResponse.json({ error: error.message || 'خطای داخلی سرور' }, { status: 500 });
   }
 }
