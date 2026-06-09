@@ -3,7 +3,7 @@ import { createServerClient } from '@supabase/ssr';
 import { cookies } from 'next/headers';
 
 // تنظیم زمان پردازش برای جلوگیری از Timeout
-export const maxDuration = 600; 
+export const maxDuration = 300; 
 
 export async function POST(request: Request) {
   try {
