@@ -4,7 +4,6 @@ import React from 'react';
 import { motion } from 'framer-motion';
 import { Sparkles, Building2, Globe2, ShieldCheck, Zap, ArrowRight, Smartphone, Shirt } from 'lucide-react';
 import Link from 'next/link';
-import Navbar from '../../components/Navbar';
 
 // ============================================================================
 // REALISTIC SOLAR SYSTEM DATA (PERFECT CENTER FIXED)
@@ -201,8 +200,6 @@ export default function AboutPage() {
         <div className="absolute inset-0" style={{ backgroundImage: 'radial-gradient(circle, #ffffff 1.5px, transparent 1.5px)', backgroundSize: '120px 120px', opacity: 0.15 }}></div>
       </div>
       {/* ========================================== */}
-
-      <Navbar />
 
       <div className="relative z-10 max-w-7xl mx-auto px-6 md:px-12 pt-40">
         
