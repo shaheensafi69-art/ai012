@@ -87,6 +87,22 @@ const TEAM_MEMBERS = [
       textHover: "group-hover:text-pink-400",
       roleText: "text-pink-500"
     }
+  },
+  {
+    id: "husnafar",
+    name: "Husnafar Shadab Zafer",
+    role: "Head of Database Management",
+    image: "/Husnafar Shadab Zafer.jpeg",
+    delay: 0.5,
+    colors: {
+      borderHover: "group-hover:border-purple-500/50",
+      shadowHover: "group-hover:shadow-[0_20px_50px_rgba(168,85,247,0.2)]",
+      glow: "from-purple-500/10",
+      ringBase: "border-purple-500/30",
+      ringHover: "group-hover:border-purple-400",
+      textHover: "group-hover:text-purple-400",
+      roleText: "text-purple-500"
+    }
   }
 ];
 
@@ -285,16 +301,16 @@ export default function AboutPage() {
                   viewport={{ once: true }}
                   transition={{ duration: 0.5, delay: member.delay }}
                   whileHover={{ y: -10 }}
-                  className="relative group cursor-pointer"
+                  className="relative group cursor-pointer h-full"
                 >
                   {/* Card Container (Dynamic Border & Shadow on Hover) */}
-                  <div className={`bg-[#0A0A0A]/80 backdrop-blur-2xl border border-white/10 rounded-[2rem] p-6 text-center shadow-[0_15px_40px_rgba(0,0,0,0.6)] ${member.colors.borderHover} ${member.colors.shadowHover} transition-all duration-500`}>
+                  <div className={`bg-[#0A0A0A]/80 backdrop-blur-2xl border border-white/10 rounded-[2rem] p-6 text-center shadow-[0_15px_40px_rgba(0,0,0,0.6)] ${member.colors.borderHover} ${member.colors.shadowHover} transition-all duration-500 h-full flex flex-col`}>
                     
                     {/* Hover Glow (Dynamic background color) */}
                     <div className={`absolute inset-0 bg-gradient-to-b ${member.colors.glow} to-transparent opacity-0 group-hover:opacity-100 transition-opacity duration-500 rounded-[2rem] pointer-events-none`} />
                     
                     {/* Profile Image (Dynamic border color) */}
-                    <div className="relative w-36 h-36 mx-auto mb-6">
+                    <div className="relative w-36 h-36 mx-auto mb-6 flex-shrink-0">
                       <div className={`absolute inset-0 rounded-full border-[3px] ${member.colors.ringBase} ${member.colors.ringHover} group-hover:scale-105 transition-all duration-500 z-20`} />
                       <img 
                         src={member.image} 
@@ -304,11 +320,11 @@ export default function AboutPage() {
                     </div>
 
                     {/* Content (Dynamic text colors) */}
-                    <div className="relative z-20">
+                    <div className="relative z-20 flex-grow flex flex-col">
                       <h3 className={`text-xl font-black text-white mb-2 ${member.colors.textHover} transition-colors`}>
                         {member.name}
                       </h3>
-                      <p className={`${member.colors.roleText} text-[10px] sm:text-xs font-bold tracking-widest uppercase h-10 flex items-center justify-center`}>
+                      <p className={`${member.colors.roleText} text-[10px] sm:text-xs font-bold tracking-widest uppercase flex items-center justify-center flex-grow`}>
                         {member.role}
                       </p>
                       
