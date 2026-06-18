@@ -102,6 +102,22 @@ const TEAM_MEMBERS = [
       textHover: "group-hover:text-purple-400",
       roleText: "text-purple-500"
     }
+  },
+  {
+    id: "mudassir",
+    name: "Mudassir Moradi",
+    role: "Social Media Manager",
+    image: "/mudassir.jpeg",
+    delay: 0.6,
+    colors: {
+      borderHover: "group-hover:border-cyan-500/50",
+      shadowHover: "group-hover:shadow-[0_20px_50px_rgba(6,182,212,0.2)]",
+      glow: "from-cyan-500/10",
+      ringBase: "border-cyan-500/30",
+      ringHover: "group-hover:border-cyan-400",
+      textHover: "group-hover:text-cyan-400",
+      roleText: "text-cyan-500"
+    }
   }
 ];
 
@@ -289,7 +305,8 @@ export default function AboutPage() {
             <p className="text-[#D4AF37]/80 text-lg font-medium">The visionaries behind Safi International Capital LTD.</p>
           </div>
 
-          <div className="grid md:grid-cols-2 lg:grid-cols-4 gap-8">
+          {/* 🟢 به منظور زیبایی و تقارن برای ۶ کارت، گرید به lg:grid-cols-3 تغییر یافت */}
+          <div className="grid md:grid-cols-2 lg:grid-cols-3 gap-8">
             {TEAM_MEMBERS.map((member) => (
               <Link key={member.id} href={`/founders/${member.id}`}>
                 <motion.div
