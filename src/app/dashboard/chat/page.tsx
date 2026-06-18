@@ -19,7 +19,9 @@ interface Message {
   role: Role;
   content: string;
   type: MessageType;
-  imageUrls?: string[]; 
+  imageUrls?: string[];
+  mediaUrl?: string;
+  mediaType?: string;
   created_at?: string;
 }
 
@@ -107,8 +109,14 @@ export default function NeuralChatPage() {
       const { data, error } = await supabase.from('chat_messages').select('*').eq('session_id', activeSessionId).order('created_at', { ascending: true });
       if (data && !error) {
         setMessages(data.map(msg => ({ 
-          id: msg.id, role: msg.role as Role, content: msg.content, type: msg.type as MessageType, 
-          imageUrls: msg.image_urls || [], created_at: msg.created_at 
+          id: msg.id,
+          role: msg.role as Role,
+          content: msg.content || '',
+          type: msg.type as MessageType,
+          imageUrls: msg.image_urls || [],
+          mediaUrl: msg.media_url || (msg.type === 'image' ? msg.content : ''),
+          mediaType: msg.media_type || (msg.type === 'image' ? 'image' : ''),
+          created_at: msg.created_at
         })));
       }
     };
@@ -436,15 +444,19 @@ export default function NeuralChatPage() {
                       {msg.type === 'image' && (
                         <div className="mt-2 relative rounded-xl overflow-hidden border border-white/10 bg-[#03000A] shadow-2xl group/img">
                           <img 
-                            src={msg.content} 
+                            src={msg.mediaUrl || msg.content || msg.imageUrls?.[0]} 
                             alt="SAFI AI Generated" 
-                            onClick={() => setFullscreenImage(msg.content)}
+                            onClick={() => setFullscreenImage(msg.mediaUrl || msg.content || msg.imageUrls?.[0] || null)}
                             className="w-full h-auto object-cover cursor-pointer hover:scale-[1.02] transition-transform duration-500" 
                           />
                           
                           <div className="absolute top-3 right-3 opacity-0 group-hover/img:opacity-100 transition-opacity duration-300 z-10">
                             <button 
-                              onClick={(e) => { e.stopPropagation(); handleDownloadImage(msg.content); }} 
+                              onClick={(e) => {
+                                e.stopPropagation();
+                                const imageUrl = msg.mediaUrl || msg.content || msg.imageUrls?.[0];
+                                if (imageUrl) handleDownloadImage(imageUrl);
+                              }} 
                               className="bg-black/70 hover:bg-black/90 backdrop-blur-md p-3 rounded-xl text-white flex items-center justify-center transition-all shadow-xl border border-white/10 hover:scale-105 active:scale-95"
                             >
                               <Download className="w-4 h-4" />

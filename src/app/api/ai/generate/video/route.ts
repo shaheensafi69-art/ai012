@@ -105,15 +105,16 @@ export async function POST(request: Request) {
       throw new Error(`خطای سرور: ${errorMessage}`);
     }
 
-    // ۶. استخراج دقیق تسک آیدی
-    const taskId = aiData.request_id;
+    // ۶. استخراج دقیق URL نهایی یا شناسه تسک
+    const taskId = aiData.request_id || aiData.task_id || aiData.id;
+    const directVideoUrl = aiData.video?.url || aiData.url || aiData.output_url || aiData.result?.url || aiData.data?.[0]?.url;
 
-    if (!taskId) {
-      throw new Error("خطا: شناسه پیگیری (request_id) از سرور دریافت نشد.");
+    const finalStatus = directVideoUrl ? 'completed' : 'processing';
+    const finalOutputUrl = directVideoUrl || (taskId ? `pending_task_${taskId}` : '');
+
+    if (!taskId && !directVideoUrl) {
+      throw new Error('خطا: هیچ شناسه پیگیری و هیچ آدرس ویدیویی از سرور دریافت نشد.');
     }
-
-    const finalOutputUrl = `pending_task_${taskId}`;
-    const finalStatus = "processing";
 
     // ۷. ثبت قطعی در دیتابیس
     const creditsToDeduct = durationInSeconds ? durationInSeconds : 1; 
@@ -123,21 +124,21 @@ export async function POST(request: Request) {
       .eq('id', userId);
 
     await supabase.from('ai_generations').insert({
-      user_id: userId, 
-      generation_type: 'video', 
+      user_id: userId,
+      generation_type: 'video',
       model_name: safiModelName,
       status: finalStatus,
-      task_id: taskId, 
-      input_params: inputData, 
-      output_url: finalOutputUrl, 
-      credits_used: creditsToDeduct 
+      task_id: taskId || null,
+      input_params: inputData,
+      output_url: finalOutputUrl,
+      credits_used: creditsToDeduct
     });
 
-    return NextResponse.json({ 
-      success: true, 
-      outputUrl: finalOutputUrl, 
-      status: finalStatus, 
-      taskId: taskId 
+    return NextResponse.json({
+      success: true,
+      outputUrl: finalOutputUrl,
+      status: finalStatus,
+      taskId: taskId || undefined
     });
 
   } catch (error: any) {

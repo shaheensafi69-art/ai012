@@ -59,25 +59,31 @@ export async function GET(request: Request) {
       return NextResponse.json({ success: false, status: 'error', message: 'خطا در استعلام وضعیت' }, { status: 500 });
     }
 
-    const aiStatus = aiData.status; 
+    const aiStatus = aiData.status;
+    const videoUrl = aiData.video?.url || aiData.url || aiData.output_url || aiData.result?.url || aiData.data?.[0]?.url;
 
-    if (aiStatus === 'done' || aiStatus === 'completed') {
-      const videoUrl = aiData.video?.url || aiData.url;
-      
-      // آپدیت نهایی در دیتابیس و تغییر وضعیت به completed
-      await supabase
-        .from('ai_generations')
-        .update({ 
-          status: 'completed', 
-          output_url: videoUrl 
-        })
-        .eq('task_id', taskId);
+    if (aiStatus === 'done' || aiStatus === 'completed' || aiStatus === 'succeeded') {
+      if (videoUrl) {
+        // آپدیت نهایی در دیتابیس و تغییر وضعیت به completed
+        await supabase
+          .from('ai_generations')
+          .update({
+            status: 'completed',
+            output_url: videoUrl
+          })
+          .eq('task_id', taskId);
 
-      return NextResponse.json({ 
-        success: true, 
-        status: 'completed', 
-        videoUrl: videoUrl, 
-        outputUrl: videoUrl 
+        return NextResponse.json({
+          success: true,
+          status: 'completed',
+          videoUrl: videoUrl,
+          outputUrl: videoUrl
+        });
+      }
+
+      return NextResponse.json({
+        success: true,
+        status: 'processing'
       });
       
     } else if (aiStatus === 'failed' || aiStatus === 'error') {

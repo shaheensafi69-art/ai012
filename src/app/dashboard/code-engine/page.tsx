@@ -20,6 +20,7 @@ interface Message {
   id: string;
   role: Role;
   content: string;
+  type?: 'text' | 'code';
   created_at: string;
 }
 
@@ -164,7 +165,11 @@ export default function CodeEnginePage() {
         
       if (data && !error) {
         setMessages(data.map(msg => ({ 
-          id: msg.id, role: msg.role as Role, content: msg.content, created_at: msg.created_at 
+          id: msg.id,
+          role: msg.role as Role,
+          content: msg.content || '',
+          type: (msg.type as 'text' | 'code') || (msg.role === 'assistant' ? 'code' : 'text'),
+          created_at: msg.created_at
         })));
       }
     };
@@ -194,8 +199,12 @@ export default function CodeEnginePage() {
     const userMsgId = Date.now().toString();
     const currentInput = input;
     
-    const newUserMessage: Message = { 
-      id: userMsgId, role: 'user', content: currentInput, created_at: currentTimeISO
+    const newUserMessage: Message = {
+      id: userMsgId,
+      role: 'user',
+      content: currentInput,
+      type: 'text',
+      created_at: currentTimeISO
     };
 
     setMessages(prev => [...prev, newUserMessage]);
@@ -206,6 +215,7 @@ export default function CodeEnginePage() {
       session_id: activeSessionId,
       role: 'user',
       content: currentInput,
+      type: 'text'
     });
     if (insertUserError) console.error("DB Insert Error (User):", insertUserError);
 
@@ -254,11 +264,12 @@ export default function CodeEnginePage() {
       const botTimeISO = new Date().toISOString();
       const botMsgId = Date.now().toString();
 
-      const botMessage: Message = { 
-        id: botMsgId, 
-        role: 'assistant', 
-        content: data.text, 
-        created_at: botTimeISO 
+      const botMessage: Message = {
+        id: botMsgId,
+        role: 'assistant',
+        content: data.text || '',
+        type: 'code',
+        created_at: botTimeISO
       };
       
       setMessages(prev => [...prev, botMessage]);
@@ -267,15 +278,19 @@ export default function CodeEnginePage() {
         id: botMsgId,
         session_id: activeSessionId,
         role: 'assistant',
-        content: data.text,
+        content: data.text || '',
+        type: 'code'
       });
       if (insertBotError) console.error("DB Insert Error (Bot):", insertBotError);
 
     } catch (error: any) {
       console.error("Code Engine Error:", error);
-      const errorMsg: Message = { 
-        id: Date.now().toString(), role: 'assistant', content: `⚠️ **System Error:** ${error.message}\n\`\`\`bash\nConnection Refused\n\`\`\``, 
-        created_at: new Date().toISOString() 
+      const errorMsg: Message = {
+        id: Date.now().toString(),
+        role: 'assistant',
+        content: `⚠️ **System Error:** ${error.message}\n\n\`\`\`bash\nConnection Refused\n\`\`\``,
+        type: 'code',
+        created_at: new Date().toISOString()
       };
       setMessages(prev => [...prev, errorMsg]);
     } finally {

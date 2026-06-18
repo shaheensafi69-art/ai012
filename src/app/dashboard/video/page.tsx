@@ -258,6 +258,31 @@ export default function VideoGeneratorPage() {
     }
   };
 
+  const handleDownloadVideo = async (url: string) => {
+    try {
+      const response = await fetch(url, { cache: 'no-store' });
+      if (!response.ok) throw new Error('Unable to fetch video asset');
+
+      const blob = await response.blob();
+      const blobUrl = window.URL.createObjectURL(blob);
+      const link = document.createElement('a');
+      link.href = blobUrl;
+      link.download = `Safi-AI-Video-${Date.now()}.mp4`;
+      document.body.appendChild(link);
+      link.click();
+      document.body.removeChild(link);
+      window.URL.revokeObjectURL(blobUrl);
+    } catch (error) {
+      console.error('Direct video download failed, attempting fallback:', error);
+      const link = document.createElement('a');
+      link.href = url;
+      link.download = `Safi-AI-Video-${Date.now()}.mp4`;
+      document.body.appendChild(link);
+      link.click();
+      document.body.removeChild(link);
+    }
+  };
+
   const handleInitializeGeneration = async (e: React.FormEvent) => {
     e.preventDefault();
     await executeGeneration(false);
@@ -511,9 +536,13 @@ export default function VideoGeneratorPage() {
                       )}
 
                       {outputVideoUrl && (
-                        <a href={outputVideoUrl} download target="_blank" rel="noreferrer" className="flex-1 min-w-[130px] py-3.5 rounded-full bg-gradient-to-r from-violet-600 to-fuchsia-600 text-white text-xs font-black uppercase flex items-center justify-center gap-2 hover:scale-[1.02] shadow-[0_0_20px_rgba(217,70,239,0.3)] transition-all">
+                        <button
+                          type="button"
+                          onClick={() => handleDownloadVideo(outputVideoUrl)}
+                          className="flex-1 min-w-[130px] py-3.5 rounded-full bg-gradient-to-r from-violet-600 to-fuchsia-600 text-white text-xs font-black uppercase flex items-center justify-center gap-2 hover:scale-[1.02] shadow-[0_0_20px_rgba(217,70,239,0.3)] transition-all"
+                        >
                           <Download className="w-4 h-4" /> Download
-                        </a>
+                        </button>
                       )}
                     </div>
                   </motion.div>

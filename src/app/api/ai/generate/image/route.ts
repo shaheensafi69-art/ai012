@@ -125,18 +125,44 @@ export async function POST(request: Request) {
     // ۷. کسر اعتبار و ثبت در دیتابیس
     const newBalance = profile.credit_balance - totalCreditsNeeded;
 
-    await Promise.all([
+    // 🟢 ایجاد لیست وظایف دیتابیس
+    const dbTasks = [
       supabase.from('profiles').update({ credit_balance: newBalance }).eq('id', userId),
       supabase.from('ai_generations').insert({
-        user_id: userId, 
-        generation_type: 'image', 
-        model_name: pricing.model_name_safi || actualApiModel, 
+        user_id: userId,
+        generation_type: 'image',
+        model_name: pricing.model_name_safi || actualApiModel,
         status: 'completed',
-        input_params: inputData, 
-        output_url: finalOutputUrl, 
+        input_params: inputData,
+        output_url: finalOutputUrl,
         credits_used: totalCreditsNeeded
       })
-    ]);
+    ];
+
+    // 🟢 ثبت ماندگار فایل در صورت وجود sessionId
+    if (inputData.sessionId) {
+      dbTasks.push(
+        supabase.from('chat_messages').insert({
+          id: `msg_img_${Date.now()}`,
+          session_id: inputData.sessionId,
+          role: 'assistant',
+          content: finalOutputUrl,
+          type: 'image',
+          image_urls: [finalOutputUrl],
+          media_url: finalOutputUrl,
+          media_type: 'image'
+        })
+      );
+
+      dbTasks.push(
+        supabase.from('chat_sessions').update({
+          updated_at: new Date().toISOString()
+        }).eq('id', inputData.sessionId)
+      );
+    }
+
+    // اجرای همزمان تمام دستورات دیتابیس
+    await Promise.all(dbTasks);
 
     return NextResponse.json({ success: true, outputUrl: finalOutputUrl, status: 'completed' });
 
