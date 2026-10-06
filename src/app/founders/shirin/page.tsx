@@ -12,19 +12,7 @@ import Image from 'next/image';
 import Link from 'next/link';
 import React, { useRef } from 'react';
 
-// ============================================================================
-// REALISTIC SOLAR SYSTEM DATA (ثابت در تمام صفحات)
-// ============================================================================
-const SOLAR_SYSTEM = [
-  { name: 'Mercury', size: 12, orbit: 300, speed: 15, gradient: 'radial-gradient(circle at 30% 30%, #b5b5b5, #5a5a5a)' },
-  { name: 'Venus', size: 18, orbit: 420, speed: 25, gradient: 'radial-gradient(circle at 30% 30%, #e8c382, #8b6d3b)' },
-  { name: 'Earth', size: 20, orbit: 560, speed: 35, gradient: 'radial-gradient(circle at 30% 30%, #4b9fe3, #154673)' },
-  { name: 'Mars', size: 16, orbit: 700, speed: 45, gradient: 'radial-gradient(circle at 30% 30%, #c1440e, #7a2806)' },
-  { name: 'Jupiter', size: 45, orbit: 950, speed: 80, gradient: 'radial-gradient(circle at 30% 30%, #d39c7e, #8c5a40)' },
-  { name: 'Saturn', size: 38, orbit: 1200, speed: 120, gradient: 'radial-gradient(circle at 30% 30%, #ead6b8, #9e8461)', hasRing: true },
-  { name: 'Uranus', size: 28, orbit: 1450, speed: 180, gradient: 'radial-gradient(circle at 30% 30%, #82b3d1, #3f708e)' },
-  { name: 'Neptune', size: 28, orbit: 1700, speed: 250, gradient: 'radial-gradient(circle at 30% 30%, #3f54ba, #1a2668)' },
-];
+import TechBackground from '@/components/TechBackground';
 
 // --- Custom Brand Icons (SVGs) ---
 const LinkedinIcon = ({ size = 18 }) => (
@@ -75,75 +63,8 @@ export default function ShirinGolAhmadiBio() {
   return (
     <div className="min-h-screen bg-[#020202] text-white pb-20 font-sans overflow-x-hidden selection:bg-pink-500 selection:text-black" dir="ltr" onMouseMove={handleMouseMove}>
       
-      {/* ==========================================
-          REALISTIC 3D SOLAR SYSTEM BACKGROUND (PERFECT CENTER FIXED)
-      ========================================== */}
-      <div className="fixed inset-0 z-0 overflow-hidden pointer-events-none">
-        
-        {/* یک هاله صورتی ظریف روی کل صفحه برای حفظ تم پروفایل شیرین */}
-        <div className="absolute inset-0 bg-pink-900/5 mix-blend-screen z-10" />
-
-        {/* نقطه ثقل صفر دقیقاً در مرکز مانیتور */}
-        <div className="absolute top-1/2 left-1/2 w-0 h-0">
-          
-          {/* 1. THE BURNING SUN */}
-          <div className="absolute -left-[600px] -top-[600px] w-[1200px] h-[1200px] bg-[#ff7b00]/10 rounded-full blur-[200px]" />
-          <div className="absolute -left-[300px] -top-[300px] w-[600px] h-[600px] bg-[#ffdd00]/15 rounded-full blur-[100px]" />
-          
-          <motion.div 
-            animate={{ scale: [1, 1.03, 1] }}
-            transition={{ duration: 3, repeat: Infinity, ease: "easeInOut" }}
-            className="absolute -left-[80px] -top-[80px] w-[160px] h-[160px] rounded-full"
-            style={{
-              background: 'radial-gradient(circle at 50% 50%, #ffffff 0%, #ffdd00 20%, #ff5e00 60%, #cc0000 90%)',
-              boxShadow: '0 0 80px #ff5e00, 0 0 150px #ffdd00, inset -10px -10px 30px rgba(150,0,0,0.8)'
-            }}
-          >
-            <motion.div 
-              animate={{ rotate: 360 }}
-              transition={{ duration: 60, repeat: Infinity, ease: "linear" }}
-              className="absolute inset-0 rounded-full mix-blend-overlay opacity-60" 
-              style={{ backgroundImage: 'radial-gradient(#000 2px, transparent 4px)', backgroundSize: '12px 12px' }} 
-            />
-          </motion.div>
-
-          {/* 2. THE PLANETS */}
-          {SOLAR_SYSTEM.map((planet) => (
-            <motion.div
-              key={planet.name}
-              animate={{ rotate: 360 }}
-              transition={{ duration: planet.speed, repeat: Infinity, ease: "linear" }}
-              className="absolute border border-white/[0.03] rounded-full"
-              style={{ 
-                width: planet.orbit, 
-                height: planet.orbit, 
-                left: -(planet.orbit / 2), 
-                top: -(planet.orbit / 2),
-                transformStyle: 'preserve-3d'
-              }}
-            >
-              <motion.div 
-                animate={{ rotate: -360 }} 
-                transition={{ duration: 10, repeat: Infinity, ease: "linear" }}
-                className="absolute top-0 left-1/2 rounded-full"
-                style={{
-                  width: planet.size,
-                  height: planet.size,
-                  background: planet.gradient,
-                  marginLeft: -(planet.size / 2),
-                  marginTop: -(planet.size / 2),
-                  boxShadow: 'inset -4px -4px 10px rgba(0,0,0,0.9), 0 0 15px rgba(255,255,255,0.1)'
-                }}
-              >
-                {planet.hasRing && (
-                  <div className="absolute top-1/2 left-1/2 w-[220%] h-[30%] border-[3px] border-[#ead6b8]/50 rounded-[50%] -translate-x-1/2 -translate-y-1/2 rotate-[20deg] shadow-[0_0_10px_rgba(234,214,184,0.3)]" />
-                )}
-              </motion.div>
-            </motion.div>
-          ))}
-        </div>
-        <div className="absolute inset-0" style={{ backgroundImage: 'radial-gradient(circle, #ffffff 1.5px, transparent 1.5px)', backgroundSize: '120px 120px', opacity: 0.15 }}></div>
-      </div>
+      {/* Sleek, executive enterprise tech background */}
+      <TechBackground variant="pink" />
 
       <div className="relative z-10">
         
@@ -168,7 +89,8 @@ export default function ShirinGolAhmadiBio() {
 
           <motion.div initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} className="text-center mt-12 px-6">
             <h1 className="text-6xl md:text-8xl font-black italic tracking-tighter text-white">SHIRIN <span className="text-pink-500">GOL AHMADI</span></h1>
-            <p className="text-pink-500 font-bold tracking-[0.3em] text-lg mt-4 uppercase">SafiPay Manager & Full Stack Developer</p>
+            <p className="text-pink-500 font-bold tracking-[0.3em] text-lg mt-4 uppercase">Ecosystem General Manager • Safi International Capital LTD</p>
+
             
             {/* Social Links */}
             <div className="flex justify-center gap-4 mt-8">

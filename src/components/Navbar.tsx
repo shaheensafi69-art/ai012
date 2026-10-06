@@ -13,9 +13,10 @@ import { supabase } from '../lib/supabase';
 // ============================================================================
 const NAV_LINKS = [
   { name: 'Home', href: '/' },
+  { name: 'Services', href: '/services' },
   { name: 'Pricing', href: '/pricing' },
-  { name: 'Contact', href: '/contact' },
   { name: 'About', href: '/about' },
+  { name: 'Contact', href: '/contact' },
 ];
 
 // ============================================================================

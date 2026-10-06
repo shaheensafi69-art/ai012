@@ -4,37 +4,15 @@ import React from 'react';
 import { motion } from 'framer-motion';
 import Link from 'next/link';
 import { ArrowLeft, Lock } from 'lucide-react';
-import Navbar from '../../components/Navbar';
-// ============================================================================
-// REALISTIC SOLAR SYSTEM DATA
-// ============================================================================
-const SOLAR_SYSTEM = [
-  { name: 'Mercury', size: 12, orbit: 300, speed: 15, gradient: 'radial-gradient(circle at 30% 30%, #b5b5b5, #5a5a5a)' },
-  { name: 'Venus', size: 18, orbit: 420, speed: 25, gradient: 'radial-gradient(circle at 30% 30%, #e8c382, #8b6d3b)' },
-  { name: 'Earth', size: 20, orbit: 560, speed: 35, gradient: 'radial-gradient(circle at 30% 30%, #4b9fe3, #154673)' },
-  { name: 'Mars', size: 16, orbit: 700, speed: 45, gradient: 'radial-gradient(circle at 30% 30%, #c1440e, #7a2806)' },
-  { name: 'Jupiter', size: 45, orbit: 950, speed: 80, gradient: 'radial-gradient(circle at 30% 30%, #d39c7e, #8c5a40)' },
-  { name: 'Saturn', size: 38, orbit: 1200, speed: 120, gradient: 'radial-gradient(circle at 30% 30%, #ead6b8, #9e8461)', hasRing: true },
-  { name: 'Uranus', size: 28, orbit: 1450, speed: 180, gradient: 'radial-gradient(circle at 30% 30%, #82b3d1, #3f708e)' },
-  { name: 'Neptune', size: 28, orbit: 1700, speed: 250, gradient: 'radial-gradient(circle at 30% 30%, #3f54ba, #1a2668)' },
-];
+import Navbar from '@/components/Navbar';
+import Footer from '@/components/Footer';
+import TechBackground from '@/components/TechBackground';
 
 export default function PrivacyPolicyPage() {
   return (
     <main className="relative min-h-screen bg-[#020202] text-white overflow-hidden pb-24">
-      
-      {/* BACKGROUND */}
-      <div className="fixed inset-0 z-0 overflow-hidden pointer-events-none">
-        <div className="absolute top-1/2 left-1/2 w-0 h-0 opacity-40">
-          <div className="absolute -left-[600px] -top-[600px] w-[1200px] h-[1200px] bg-[#ff7b00]/10 rounded-full blur-[200px]" />
-          <motion.div animate={{ rotate: 360 }} transition={{ duration: 60, repeat: Infinity, ease: "linear" }} className="absolute inset-0 rounded-full mix-blend-overlay opacity-60" style={{ backgroundImage: 'radial-gradient(#000 2px, transparent 4px)', backgroundSize: '12px 12px' }} />
-          {SOLAR_SYSTEM.map((planet) => (
-            <motion.div key={planet.name} animate={{ rotate: 360 }} transition={{ duration: planet.speed, repeat: Infinity, ease: "linear" }} className="absolute border border-white/[0.03] rounded-full" style={{ width: planet.orbit, height: planet.orbit, left: -(planet.orbit / 2), top: -(planet.orbit / 2), transformStyle: 'preserve-3d' }}>
-              <motion.div animate={{ rotate: -360 }} transition={{ duration: 10, repeat: Infinity, ease: "linear" }} className="absolute top-0 left-1/2 rounded-full" style={{ width: planet.size, height: planet.size, background: planet.gradient, marginLeft: -(planet.size / 2), marginTop: -(planet.size / 2) }} />
-            </motion.div>
-          ))}
-        </div>
-      </div>
+      {/* Sleek, executive enterprise tech background */}
+      <TechBackground variant="default" />
 
       <Navbar />
 
@@ -106,6 +84,7 @@ export default function PrivacyPolicyPage() {
           </div>
         </motion.div>
       </div>
+      <Footer />
     </main>
   );
 }

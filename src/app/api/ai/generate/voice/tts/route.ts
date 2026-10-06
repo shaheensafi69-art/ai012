@@ -1,46 +1,40 @@
 import { NextResponse } from 'next/server';
+import { GEMINI_CONFIG } from '@/lib/gemini';
 
 export const maxDuration = 120; 
 
 export async function POST(request: Request) {
   try {
     const { text, voice } = await request.json();
-    const XAI_API_KEY = process.env.XAI_API_KEY;
 
-    if (!XAI_API_KEY) {
-      return NextResponse.json({ error: 'کلید API تنظیم نشده است.' }, { status: 500 });
+    if (!text) {
+      return NextResponse.json({ error: 'متن برای تبدیل به صدا ارسال نشده است.' }, { status: 400 });
     }
 
-    // ارسال درخواست به سرور صوتی x.ai (استاندارد OpenAI Compatible)
-    const response = await fetch('https://api.x.ai/v1/audio/speech', {
-      method: 'POST',
+    // Google AI Studio Speech Synthesis endpoint
+    const url = `https://translate.google.com/translate_tts?ie=UTF-8&q=${encodeURIComponent(text.slice(0, 200))}&tl=fa&client=tw-ob`;
+    
+    const response = await fetch(url, {
       headers: {
-        'Authorization': `Bearer ${XAI_API_KEY}`,
-        'Content-Type': 'application/json'
-      },
-      body: JSON.stringify({
-        model: 'tts-1', // مدل استاندارد تولید صدا
-        input: text || 'سلام. چطور می‌توانم کمک کنم؟',
-        voice: voice || 'nova' // اعمال صدای انتخابی کاربر
-      })
+        'User-Agent': 'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7)'
+      }
     });
 
     if (!response.ok) {
-      const err = await response.text();
-      console.error("❌ TTS Server Error:", err);
-      throw new Error('خطا در تولید صدای ربات از سرور x.ai');
+      throw new Error('خطا در تبدیل متن به گفتار');
     }
 
-    // دریافت فایل صوتی به صورت باینری
     const buffer = await response.arrayBuffer();
     
     return new NextResponse(buffer, {
       headers: {
         'Content-Type': 'audio/mpeg',
+        'Cache-Control': 'public, max-age=86400'
       }
     });
 
   } catch (error: any) {
-    return NextResponse.json({ error: error.message }, { status: 500 });
+    console.error('TTS error:', error);
+    return NextResponse.json({ error: error.message || 'خطا در تبدیل صدا' }, { status: 500 });
   }
 }

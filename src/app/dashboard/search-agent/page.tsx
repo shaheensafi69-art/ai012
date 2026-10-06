@@ -132,7 +132,7 @@ export default function SearchAgentPage() {
     setDropdownOpenId(null);
   };
 
-  // 🟢 هندلر ارایه اطلاعات و مدیریت استریمینگ بومی xAI
+  // 🟢 هندلر ارایه اطلاعات و مدیریت جستجوی برخط Google AI Studio (Search Grounded)
   const handleSendMessage = async () => {
     if (!input.trim() || isTyping || !userId || !activeSessionId) return;
 

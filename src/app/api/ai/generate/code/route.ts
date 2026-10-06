@@ -1,6 +1,7 @@
 import { NextResponse } from 'next/server';
 import { createServerClient } from '@supabase/ssr';
 import { cookies } from 'next/headers';
+import { generateGeminiContent } from '@/lib/gemini';
 
 export async function POST(request: Request) {
   try {
@@ -28,85 +29,47 @@ export async function POST(request: Request) {
       return NextResponse.json({ error: 'دسترسی غیرمجاز.' }, { status: 401 });
     }
 
-    const XAI_API_KEY = process.env.XAI_API_KEY;
-    if (!XAI_API_KEY) {
-      console.error("Critical: XAI_API_KEY is missing.");
-      return NextResponse.json({ error: 'مشکل فنی در سیستم رخ داده است.' }, { status: 500 });
-    }
-
-    const systemPrompt = {
-      role: 'system',
-      content: `You are SAFI Neural Code Engine, a senior full-stack software architect and production engineer.
+    const systemPrompt = `You are SAFI Neural Code Engine, an elite full-stack software architect and senior software engineer.
+You are powered by Google AI Studio Gemini Enterprise.
 
 Your responsibilities:
-- Explain the solution clearly in simple, professional language before presenting code.
-- For full-stack requests, think about architecture, database schema, API flow, authentication, validation, error handling, scalability, and maintainability.
-- Prefer clean, real-world production code over placeholder snippets.
-- If the user asks for an app or website, propose a sensible folder structure and component flow.
-- Always return:
-  1. A short explanation of what you are building and why.
-  2. A concise implementation plan if the task is large.
-  3. Code blocks for the relevant files.
-  4. Notes about dependencies, environment variables, and next steps when needed.
+- Provide direct, clear, production-ready code with best architectural patterns.
+- Always include clean markdown code fences with correct language identifiers.
+- Explain trade-offs, security, and edge-cases.
+- Prefer elegant, modern TypeScript, Next.js, React, Tailwind CSS, or backend structures.`;
 
-Rules:
-- Do not give vague answers.
-- Use proper markdown code fences with the correct language tag.
-- Include professional comments where helpful.
-- If the user gives an error, diagnose the root cause and provide the exact fix.
-- When multiple files are needed, label them clearly, for example: 
-  - File: src/app/page.tsx
-  - File: src/lib/db.ts
-- Keep explanations practical and focused on shipping a working solution.`
-    };
+    const contents: Array<{ role: string; parts: Array<{ text: string }> }> = [];
 
-    const formattedHistory = messages.map((msg: any) => ({
-      role: msg.role,
-      content: msg.content
-    }));
+    for (const msg of messages) {
+      contents.push({
+        role: msg.role === 'assistant' ? 'model' : 'user',
+        parts: [{ text: msg.content }]
+      });
+    }
 
-    // ارسال درخواست به مدل جدید xAI مخصوص کدنویسی (grok-build-0.1)
-    const response = await fetch('https://api.x.ai/v1/chat/completions', {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-        'Authorization': `Bearer ${XAI_API_KEY}`,
-      },
-      body: JSON.stringify({
-        model: 'grok-build-0.1',
-        messages: [
-          systemPrompt,
-          ...formattedHistory,
-          {
-            role: 'user',
-            content: `${prompt}\n\nImportant: provide a clear explanation first, then the relevant code blocks. If the request is large, include a short architecture plan and file-by-file implementation.`
-          }
-        ],
-        temperature: 0.2,
-        max_tokens: 16384
-      }),
+    contents.push({
+      role: 'user',
+      parts: [{ text: `${prompt}\n\nPlease generate a clean, fully-functioning production solution.` }]
     });
 
-    if (!response.ok) {
-      const errorData = await response.json();
-      console.error('API Provider Error:', errorData);
-      return NextResponse.json({ error: 'مشکل سیستم در پردازش درخواست، لطفاً لحظاتی دیگر تلاش کنید.' }, { status: 500 });
-    }
+    const result = await generateGeminiContent({
+      model: 'gemini-2.5-pro',
+      contents,
+      systemInstruction: systemPrompt,
+      temperature: 0.2,
+      maxOutputTokens: 8192
+    });
 
-    const data = await response.json();
-    const generatedCode = data.choices?.[0]?.message?.content || '';
-
-    if (!generatedCode) {
-      return NextResponse.json({ error: 'پاسخ خالی از سمت موتور کدنویسی دریافت شد.' }, { status: 500 });
-    }
-
-    return NextResponse.json({ success: true, text: generatedCode });
+    return NextResponse.json({
+      success: true,
+      code: result.text,
+      modelUsed: `Google AI Studio (${result.modelUsed})`
+    });
 
   } catch (error: any) {
     console.error('Code Engine Backend Error:', error);
-    return NextResponse.json(
-      { error: 'مشکل سیستم در برقراری ارتباط، لطفاً دوباره تلاش کنید.' },
-      { status: 500 }
-    );
+    return NextResponse.json({ 
+      error: error.message || 'خطا در پردازش موتور کدنویسی' 
+    }, { status: 500 });
   }
 }

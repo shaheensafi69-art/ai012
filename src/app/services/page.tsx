@@ -8,6 +8,9 @@ import {
   ArrowRight, Sparkles, Zap, ShieldCheck
 } from 'lucide-react';
 import Link from 'next/link';
+import TechBackground from '@/components/TechBackground';
+import Navbar from '@/components/Navbar';
+import Footer from '@/components/Footer';
 
 // Active Services
 const CURRENT_SERVICES = [
@@ -87,48 +90,12 @@ export default function ServicesPage() {
   return (
     <main className="relative min-h-screen bg-[#020202] text-slate-100 selection:bg-[#FAD961] selection:text-black overflow-hidden pb-24">
       
-      {/* ==========================================
-          SOLAR SYSTEM BACKGROUND EFFECTS
-      ========================================== */}
-      <div className="fixed inset-0 z-0 pointer-events-none overflow-hidden">
-        {/* Central Core / Sun */}
-        <div className="absolute top-[40%] left-1/2 -translate-x-1/2 -translate-y-1/2 w-[800px] h-[800px] bg-[#D4AF37]/5 rounded-full blur-[120px]" />
-        
-        {/* Orbital Rings & Planets */}
-        <div className="absolute top-[40%] left-1/2 -translate-x-1/2 -translate-y-1/2">
-          {/* Orbit 1 */}
-          <motion.div 
-            animate={{ rotate: 360 }} 
-            transition={{ duration: 40, repeat: Infinity, ease: "linear" }}
-            className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-[500px] h-[500px] border border-white/[0.03] rounded-full"
-          >
-            <div className="absolute top-0 left-1/2 -translate-x-1/2 -translate-y-1/2 w-2 h-2 bg-[#FAD961] rounded-full shadow-[0_0_15px_#FAD961]" />
-          </motion.div>
+      {/* Sleek, executive enterprise tech background */}
+      <TechBackground variant="default" />
+      <Navbar />
 
-          {/* Orbit 2 */}
-          <motion.div 
-            animate={{ rotate: -360 }} 
-            transition={{ duration: 80, repeat: Infinity, ease: "linear" }}
-            className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-[800px] h-[800px] border border-white/[0.03] rounded-full"
-          >
-            <div className="absolute bottom-0 left-1/2 -translate-x-1/2 translate-y-1/2 w-4 h-4 bg-[#D4AF37] rounded-full shadow-[0_0_20px_#D4AF37]" />
-          </motion.div>
+      <div className="relative z-10 max-w-[85rem] mx-auto pt-40 px-6 lg:px-16">
 
-          {/* Orbit 3 */}
-          <motion.div 
-            animate={{ rotate: 360 }} 
-            transition={{ duration: 150, repeat: Infinity, ease: "linear" }}
-            className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-[1200px] h-[1200px] border border-white/[0.02] rounded-full"
-          >
-            <div className="absolute top-1/2 right-0 translate-x-1/2 -translate-y-1/2 w-3 h-3 bg-white/30 rounded-full shadow-[0_0_15px_rgba(255,255,255,0.3)]" />
-          </motion.div>
-        </div>
-
-        {/* Star Grid */}
-        <div className="absolute inset-0" style={{ backgroundImage: 'radial-gradient(circle, #ffffff 1px, transparent 1px)', backgroundSize: '100px 100px', opacity: 0.04 }} />
-      </div>
-
-      <div className="relative z-10 max-w-[85rem] mx-auto pt-32 px-6 lg:px-16">
         
         {/* ==========================================
             HEADER SECTION
@@ -260,8 +227,8 @@ export default function ServicesPage() {
             </Link>
           </div>
         </motion.div>
-
       </div>
+      <Footer />
     </main>
   );
 }

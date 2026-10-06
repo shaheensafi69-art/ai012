@@ -354,7 +354,7 @@ export default function VideoGeneratorPage() {
                   {videoModels.length === 0 && <option>Loading core configs...</option>}
                   {videoModels.map((model) => (
                     <option key={model.id} value={model.id} className="bg-[#03000A] text-white">
-                      {model.model_name}
+                      {model.model_name_safi ? `${model.model_name_safi}` : model.model_name}
                     </option>
                   ))}
                 </select>

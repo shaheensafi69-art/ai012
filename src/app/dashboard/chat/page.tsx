@@ -248,13 +248,13 @@ export default function NeuralChatPage() {
       }
 
       const targetModelConfig = aiModels.find(m => m.category.toLowerCase() === categoryToSearch);
-      if (!targetModelConfig) throw new Error(`Model for ${categoryToSearch} not found.`);
+      const effectivePricingId = targetModelConfig?.id || (activeMode === 'image' ? '4e738086-cf3c-49e6-9d36-c502c9887ec5' : 'f5049e01-1506-4730-802e-69b429a3d7f4');
 
       const response = await fetch(targetApiEndpoint, {
         method: 'POST', headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ 
           userId: userId, 
-          pricingId: targetModelConfig.id, 
+          pricingId: effectivePricingId, 
           inputData: { 
             prompt: newUserMessage.content, 
             aspectRatio: '16:9', 
@@ -379,8 +379,11 @@ export default function NeuralChatPage() {
               <div className="flex items-center gap-3">
                 <div className="w-9 h-9 rounded-xl bg-gradient-to-tr from-violet-600 to-fuchsia-500 flex items-center justify-center shadow-[0_0_15px_rgba(217,70,239,0.3)]"><Sparkles className="w-4 h-4 text-white" /></div>
                 <div>
-                  <h1 className="text-[14px] md:text-[15px] font-black tracking-wide text-white leading-tight">SAFI Neural</h1>
-                  <p className="text-[9px] font-bold tracking-[0.2em] text-fuchsia-400 uppercase flex items-center gap-1.5 mt-0.5"><span className="w-1.5 h-1.5 rounded-full bg-emerald-400 animate-pulse shadow-[0_0_10px_#34d399]" /> Active Engine</p>
+                  <h1 className="text-[14px] md:text-[15px] font-black tracking-wide text-white leading-tight">SAFI Neural Core</h1>
+                  <p className="text-[9px] font-bold tracking-[0.2em] text-[#FAD961] uppercase flex items-center gap-1.5 mt-0.5">
+                    <span className="w-1.5 h-1.5 rounded-full bg-emerald-400 animate-pulse shadow-[0_0_10px_#34d399]" /> 
+                    Google AI Studio (Gemini 2.5)
+                  </p>
                 </div>
               </div>
             </div>
